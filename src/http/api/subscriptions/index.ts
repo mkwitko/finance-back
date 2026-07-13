@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod/v4";
 import { db } from "../../../infra/db/client.js";
 import { entitlementsFor } from "../../../domain/entitlements.js";
+import type { SubscriptionPlan, SubscriptionStatus } from "../../../infra/db/tables/subscriptions/subscription.table.js";
 import { requireUser } from "../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../hooks/household/household.js";
 import { createSubscriptionsRepository } from "./subscriptions.repository.js";
@@ -10,9 +11,10 @@ import { SubscriptionView } from "./subscriptions.schema.js";
 
 export const subscriptionsRoutes: FastifyPluginAsync = async (app) => {
   const repo = createSubscriptionsRepository(db);
-  const present = (plan: "free" | "premium", status: "active" | "canceled" | "expired", periodEnd: string | null) => ({
-    plan, status, currentPeriodEnd: periodEnd, entitlements: entitlementsFor(plan, status),
-  });
+  const present = (plan: SubscriptionPlan, status: SubscriptionStatus, periodEnd: string | null) => {
+    const effective: SubscriptionStatus = status === "active" && periodEnd && new Date(periodEnd) < new Date() ? "expired" : status;
+    return { plan, status: effective, currentPeriodEnd: periodEnd, entitlements: entitlementsFor(plan, effective) };
+  };
 
   app.withTypeProvider<ZodTypeProvider>().get("/households/:id/subscription", {
     preHandler: requireHouseholdRole("viewer"),

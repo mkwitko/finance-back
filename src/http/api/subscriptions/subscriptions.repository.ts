@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { Db } from "../../../infra/db/client.js";
 import {
   type SubscriptionPlan,
@@ -37,24 +37,21 @@ export function createSubscriptionsRepository(db: Db): SubscriptionsRepository {
     },
     async upsertActive({ householdId, plan, currentPeriodEnd, actorUuid }) {
       const now = new Date();
-      const existing = await current(householdId);
-      if (existing) {
-        const updated = await db.update(subscription)
-          .set({ plan, status: "active", provider: "stub", currentPeriodEnd, updatedBy: actorUuid, updatedAt: now })
-          .where(eq(subscription.id, existing.id)).returning();
-        return toDomain(updated[0] as SubscriptionRow);
-      }
-      const inserted = await db.insert(subscription).values({
+      const rows = await db.insert(subscription).values({
         householdId, plan, status: "active", provider: "stub", currentPeriodEnd,
         createdBy: actorUuid, updatedBy: actorUuid, createdAt: now, updatedAt: now,
+      }).onConflictDoUpdate({
+        target: subscription.householdId,
+        targetWhere: sql`${subscription.deletedAt} is null`,
+        set: { plan, status: "active", provider: "stub", currentPeriodEnd, updatedBy: actorUuid, updatedAt: now },
       }).returning();
-      return toDomain(inserted[0] as SubscriptionRow);
+      return toDomain(rows[0] as SubscriptionRow);
     },
     async cancel({ householdId, actorUuid }) {
       const existing = await current(householdId);
       if (!existing) return null;
       const updated = await db.update(subscription)
-        .set({ status: "canceled", updatedBy: actorUuid, updatedAt: new Date() })
+        .set({ plan: "free", status: "canceled", updatedBy: actorUuid, updatedAt: new Date() })
         .where(eq(subscription.id, existing.id)).returning();
       return toDomain(updated[0] as SubscriptionRow);
     },

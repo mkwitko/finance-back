@@ -30,6 +30,134 @@ export type ImportServiceDeps = {
   importsRepo: ImportsRepository;
 };
 
+export type PreviewRow = {
+  amountCents: number;
+  direction: "in" | "out";
+  occurredAt: string;
+  description: string;
+  rawRef: string | null;
+  suggestedCategory: string | null;
+  confidence: number;
+  duplicate: boolean;
+};
+
+export type CommitRow = {
+  amountCents: number;
+  direction: "in" | "out";
+  occurredAt: string;
+  description: string;
+  rawRef: string | null;
+  categoryName: string | null;
+};
+
+async function parseRows(
+  source: ImportSource,
+  content: string,
+  gateway: DeepseekGateway,
+): Promise<NormalizedRow[]> {
+  if (source === "ofx") return parseOfx(content);
+  if (source === "csv") return parseCsv(content);
+  const extracted = await gateway.extractReceipt(content);
+  return extracted.map((e) => ({
+    amountCents: e.amountCents,
+    direction: e.direction,
+    occurredAt: e.occurredAt ? new Date(e.occurredAt) : new Date(),
+    description: e.description.slice(0, 512),
+    rawRef: null,
+  }));
+}
+
+async function categorizeRows(
+  householdId: number,
+  rows: NormalizedRow[],
+  deps: { deepseek: DeepseekGateway; categoriesRepo: CategoriesRepository },
+) {
+  const categories = await deps.categoriesRepo.listVisible(householdId);
+  const byName = new Map(categories.map((c) => [c.name, c]));
+  const categorizations = await deps.deepseek.categorizeTransactions({
+    categories: categories.map((c) => ({ name: c.name, kind: c.kind })),
+    items: rows.map((r, index) => ({
+      index,
+      description: r.description,
+      direction: r.direction,
+      amountCents: r.amountCents,
+    })),
+  });
+  return { byName, catByIndex: new Map(categorizations.map((c) => [c.index, c])) };
+}
+
+export function createPreviewService(deps: ImportServiceDeps) {
+  return async (input: {
+    householdId: number;
+    accountId: number;
+    source: ImportSource;
+    content: string;
+  }): Promise<PreviewRow[]> => {
+    const rows = await parseRows(input.source, input.content, deps.deepseek);
+    const refs = rows.map((r) => r.rawRef).filter((r): r is string => r !== null);
+    const seen = await deps.importsRepo.existingRawRefs(input.accountId, refs);
+    const { catByIndex } = await categorizeRows(input.householdId, rows, deps);
+    return rows.map((r, index) => {
+      const guess = catByIndex.get(index);
+      return {
+        amountCents: r.amountCents,
+        direction: r.direction,
+        occurredAt: r.occurredAt.toISOString(),
+        description: r.description,
+        rawRef: r.rawRef,
+        suggestedCategory: guess?.category ?? null,
+        confidence: Math.round(guess?.confidence ?? 0),
+        duplicate: r.rawRef !== null && seen.has(r.rawRef),
+      };
+    });
+  };
+}
+
+export function createCommitService(deps: ImportServiceDeps) {
+  return async (input: {
+    householdId: number;
+    accountId: number;
+    rows: CommitRow[];
+    actorUuid: string;
+  }): Promise<{ importId: string; imported: number; skipped: number }> => {
+    const batch = await deps.importsRepo.createBatch({
+      householdId: input.householdId,
+      // Committed batches aggregate already-reviewed rows from any original
+      // source (ofx/csv/receipt); "import" tags them as such at the DB layer,
+      // which currently types this column narrower than the runtime value set.
+      source: "import" as ImportSource,
+      actorUuid: input.actorUuid,
+    });
+    try {
+      const refs = input.rows.map((r) => r.rawRef).filter((r): r is string => r !== null);
+      const seen = await deps.importsRepo.existingRawRefs(input.accountId, refs);
+      const fresh = input.rows.filter((r) => r.rawRef === null || !seen.has(r.rawRef));
+      const categories = await deps.categoriesRepo.listVisible(input.householdId);
+      const byName = new Map(categories.map((c) => [c.name, c]));
+      const toInsert: CreateTransactionInput[] = fresh.map((r) => ({
+        accountId: input.accountId,
+        categoryId: r.categoryName ? (byName.get(r.categoryName)?.id ?? null) : null,
+        importBatchId: batch.id,
+        amountCents: r.amountCents,
+        direction: r.direction,
+        occurredAt: new Date(r.occurredAt),
+        description: r.description.slice(0, 512),
+        source: "import",
+        rawRef: r.rawRef,
+        aiCategorized: false,
+        aiConfidence: null,
+        actorUuid: input.actorUuid,
+      }));
+      const imported = await deps.transactionsRepo.createMany(toInsert);
+      await deps.importsRepo.markCompleted(batch.id, imported);
+      return { importId: batch.uuid, imported, skipped: input.rows.length - fresh.length };
+    } catch (err) {
+      await deps.importsRepo.markFailed(batch.id, err instanceof Error ? err.message : "unknown");
+      throw err;
+    }
+  };
+}
+
 export function createImportService(deps: ImportServiceDeps) {
   return async (input: ImportInput): Promise<ImportResult> => {
     const batch = await deps.importsRepo.createBatch({
@@ -40,21 +168,7 @@ export function createImportService(deps: ImportServiceDeps) {
 
     try {
       // 1. Parse the upload into normalized rows.
-      let rows: NormalizedRow[];
-      if (input.source === "ofx") {
-        rows = parseOfx(input.content);
-      } else if (input.source === "csv") {
-        rows = parseCsv(input.content);
-      } else {
-        const extracted = await deps.deepseek.extractReceipt(input.content);
-        rows = extracted.map((e) => ({
-          amountCents: e.amountCents,
-          direction: e.direction,
-          occurredAt: e.occurredAt ? new Date(e.occurredAt) : new Date(),
-          description: e.description.slice(0, 512),
-          rawRef: null,
-        }));
-      }
+      const rows = await parseRows(input.source, input.content, deps.deepseek);
 
       // 2. Skip rows already imported for this account (dedup on rawRef).
       const refs = rows.map((r) => r.rawRef).filter((r): r is string => r !== null);
@@ -62,18 +176,7 @@ export function createImportService(deps: ImportServiceDeps) {
       const fresh = rows.filter((r) => r.rawRef === null || !seen.has(r.rawRef));
 
       // 3. AI-categorize (best effort — never blocks the import).
-      const categories = await deps.categoriesRepo.listVisible(input.householdId);
-      const byName = new Map(categories.map((c) => [c.name, c]));
-      const categorizations = await deps.deepseek.categorizeTransactions({
-        categories: categories.map((c) => ({ name: c.name, kind: c.kind })),
-        items: fresh.map((r, index) => ({
-          index,
-          description: r.description,
-          direction: r.direction,
-          amountCents: r.amountCents,
-        })),
-      });
-      const catByIndex = new Map(categorizations.map((c) => [c.index, c]));
+      const { byName, catByIndex } = await categorizeRows(input.householdId, fresh, deps);
 
       // 4. Persist.
       const transactionSource = input.source === "receipt" ? "receipt" : "import";

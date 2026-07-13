@@ -15,6 +15,13 @@
       "when": 1783958767933,
       "tag": "0001_complete_havok",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783964997364,
+      "tag": "0002_acoustic_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }

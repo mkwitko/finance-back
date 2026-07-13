@@ -26,6 +26,13 @@ export const ERRORS = {
     NOT_A_MEMBER: make("HH-T0002", 403, "household_not_a_member"),
     INSUFFICIENT_ROLE: make("HH-T0003", 403, "household_insufficient_role"),
     NOT_FOUND: make("HH-T0004", 404, "household_not_found"),
+    LAST_OWNER: make("HH-T0005", 409, "household_last_owner"),
+  },
+  INVITATION: {
+    NOT_FOUND: make("INV-T0001", 404, "invitation_not_found"),
+    EXPIRED: make("INV-T0002", 410, "invitation_expired"),
+    ALREADY_MEMBER: make("INV-T0003", 409, "invitation_already_member"),
+    ROLE_TOO_HIGH: make("INV-T0004", 403, "invitation_role_too_high"),
   },
   RESOURCE: {
     NOT_FOUND: make("RES-T0001", 404, "resource_not_found"),

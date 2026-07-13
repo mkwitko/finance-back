@@ -117,7 +117,10 @@ export function createHouseholdsRepository(db: Db): HouseholdsRepository {
           createdAt: now,
           updatedAt: now,
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [membership.userId, membership.householdId],
+          set: { role, deletedAt: null, updatedBy: actorUuid, updatedAt: now },
+        });
     },
   };
 }

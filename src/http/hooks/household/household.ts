@@ -1,20 +1,11 @@
 import type { FastifyRequest, preHandlerHookHandler } from "fastify";
 import { db } from "../../../infra/db/client.js";
 import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
+import { ROLE_RANK } from "../../../infra/db/tables/households/membership.table.js";
 import { ERRORS } from "../../../shared/errors/catalog.js";
 import type { HouseholdContext } from "../../../types/household.js";
 import { createHouseholdsRepository } from "../../api/households/households.repository.js";
 import { requireUser } from "../auth/auth.js";
-
-// Roles ordered by power. `requireHousehold(min)` passes when the caller's rank is
-// >= the required rank (owner clears everything, viewer clears only viewer-level).
-const ROLE_RANK: Record<MembershipRole, number> = {
-  owner: 4,
-  adult: 3,
-  teen: 2,
-  child: 1,
-  viewer: 0,
-};
 
 const HOUSEHOLD_HEADER = "x-household-id";
 

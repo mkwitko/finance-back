@@ -9,6 +9,15 @@ import { household } from "./household.table.js";
 export const MEMBERSHIP_ROLES = ["owner", "adult", "teen", "child", "viewer"] as const;
 export type MembershipRole = (typeof MEMBERSHIP_ROLES)[number];
 
+// Roles ordered by power: owner > adult > teen > child > viewer.
+export const ROLE_RANK: Record<MembershipRole, number> = {
+  owner: 4,
+  adult: 3,
+  teen: 2,
+  child: 1,
+  viewer: 0,
+};
+
 export const membership = pgTable(
   "membership",
   {

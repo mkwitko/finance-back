@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod/v4";
 import { db } from "../../../infra/db/client.js";
-import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
+import { ROLE_RANK } from "../../../infra/db/tables/households/membership.table.js";
 import { ERRORS } from "../../../shared/errors/catalog.js";
 import { requireUser } from "../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../hooks/household/household.js";
@@ -18,14 +18,6 @@ import {
   ListInvitationsResponse,
   RedeemResponse,
 } from "./invitations.schema.js";
-
-const ROLE_RANK: Record<MembershipRole, number> = {
-  owner: 4,
-  adult: 3,
-  teen: 2,
-  child: 1,
-  viewer: 0,
-};
 
 function present(inv: Invitation, baseUrl: string): InvitationViewT {
   return { ...inv, url: `${baseUrl}${inv.code}` };

@@ -37,6 +37,38 @@ describe("multi-account: invitations + members e2e (db)", () => {
     expect(again.statusCode).toBe(409);
   });
 
+  it("allows re-joining after leaving via a fresh invite", async () => {
+    const owner = { authorization: `Bearer ${await login("gina")}` };
+    const hh = await h.app.inject({ method: "POST", url: "/households", headers: owner, payload: { name: "Rejoin House", type: "shared" } });
+    const householdId = hh.json().id as string;
+    const ownerHh = { ...owner, "x-household-id": householdId };
+
+    const inv1 = await h.app.inject({ method: "POST", url: `/households/${householdId}/invitations`, headers: ownerHh, payload: { role: "adult" } });
+    expect(inv1.statusCode).toBe(201);
+
+    const bob = { authorization: `Bearer ${await login("heidi")}` };
+    const redeem1 = await h.app.inject({ method: "POST", url: `/invitations/${inv1.json().code}/redeem`, headers: bob });
+    expect(redeem1.statusCode).toBe(200);
+
+    const bobHh = { ...bob, "x-household-id": householdId };
+    // Bob leaves the household (soft-deletes his membership row).
+    const membersBeforeLeave = (await h.app.inject({ method: "GET", url: `/households/${householdId}/members`, headers: bobHh })).json().members;
+    const bobUserId = membersBeforeLeave.find((m: { userId: string; role: string }) => m.role === "adult").userId;
+    const leave = await h.app.inject({ method: "DELETE", url: `/households/${householdId}/members/${bobUserId}`, headers: bobHh });
+    expect(leave.statusCode).toBe(204);
+
+    // Owner mints a fresh invite; bob redeems it again.
+    const inv2 = await h.app.inject({ method: "POST", url: `/households/${householdId}/invitations`, headers: ownerHh, payload: { role: "adult" } });
+    expect(inv2.statusCode).toBe(201);
+    const redeem2 = await h.app.inject({ method: "POST", url: `/invitations/${inv2.json().code}/redeem`, headers: bob });
+    expect(redeem2.statusCode).toBe(200);
+    expect(redeem2.json().id).toBe(householdId);
+
+    const membersAfter = await h.app.inject({ method: "GET", url: `/households/${householdId}/members`, headers: { ...owner, "x-household-id": householdId } });
+    expect(membersAfter.statusCode).toBe(200);
+    expect(membersAfter.json().members).toHaveLength(2);
+  });
+
   it("rejects an invite role above the inviter's role", async () => {
     const owner = { authorization: `Bearer ${await login("carol")}` };
     const hh = await h.app.inject({ method: "POST", url: "/households", headers: owner, payload: { name: "Fam", type: "family" } });

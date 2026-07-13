@@ -65,7 +65,9 @@ export function createInvitationsRepository(db: Db): InvitationsRepository {
             .returning();
           return toDomain(inserted[0] as InvitationRow);
         } catch (err) {
-          // Unique-code collision → retry with a fresh code.
+          // Unique-code collision → retry with a fresh code. Anything else rethrows.
+          const pgCode = (err as { code?: string })?.code;
+          if (pgCode !== "23505") throw err;
           if (attempt === 4) throw err;
         }
       }

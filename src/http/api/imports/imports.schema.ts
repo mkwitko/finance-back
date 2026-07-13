@@ -23,9 +23,9 @@ export const PreviewImportBody = z.object({
 });
 
 export const PreviewRowView = z.object({
-  amountCents: z.number().int(),
+  amountCents: z.number().int().positive(),
   direction: z.enum(["in", "out"]),
-  occurredAt: z.string(),
+  occurredAt: z.iso.datetime(),
   description: z.string(),
   rawRef: z.string().nullable(),
   suggestedCategory: z.string().nullable(),
@@ -37,16 +37,18 @@ export const PreviewImportResponse = z.object({ rows: z.array(PreviewRowView) })
 export const CommitImportBody = z.object({
   source: z.enum(IMPORT_SOURCES),
   accountId: z.uuid(),
-  rows: z.array(
-    z.object({
-      amountCents: z.number().int(),
-      direction: z.enum(["in", "out"]),
-      occurredAt: z.string(),
-      description: z.string().min(1).max(512),
-      rawRef: z.string().nullable(),
-      categoryName: z.string().nullable(),
-    }),
-  ),
+  rows: z
+    .array(
+      z.object({
+        amountCents: z.number().int().positive(),
+        direction: z.enum(["in", "out"]),
+        occurredAt: z.iso.datetime(),
+        description: z.string().min(1).max(512),
+        rawRef: z.string().max(512).nullable(),
+        categoryName: z.string().max(255).nullable(),
+      }),
+    )
+    .max(2000),
 });
 export const CommitImportResponse = z.object({
   importId: z.uuid(),

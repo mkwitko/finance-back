@@ -103,7 +103,7 @@ export function createPreviewService(deps: ImportServiceDeps) {
         amountCents: r.amountCents,
         direction: r.direction,
         occurredAt: r.occurredAt.toISOString(),
-        description: r.description,
+        description: r.description.slice(0, 512),
         rawRef: r.rawRef,
         suggestedCategory: guess?.category ?? null,
         confidence: Math.round(guess?.confidence ?? 0),
@@ -129,7 +129,14 @@ export function createCommitService(deps: ImportServiceDeps) {
     try {
       const refs = input.rows.map((r) => r.rawRef).filter((r): r is string => r !== null);
       const seen = await deps.importsRepo.existingRawRefs(input.accountId, refs);
-      const fresh = input.rows.filter((r) => r.rawRef === null || !seen.has(r.rawRef));
+      const seenInBatch = new Set<string>();
+      const fresh = input.rows.filter((r) => {
+        if (r.rawRef === null) return true;
+        if (seen.has(r.rawRef)) return false;
+        if (seenInBatch.has(r.rawRef)) return false;
+        seenInBatch.add(r.rawRef);
+        return true;
+      });
       const categories = await deps.categoriesRepo.listVisible(input.householdId);
       const byName = new Map(categories.map((c) => [c.name, c]));
       const toInsert: CreateTransactionInput[] = fresh.map((r) => ({

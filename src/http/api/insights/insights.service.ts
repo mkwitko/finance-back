@@ -30,6 +30,7 @@ export function createInsightsService(deps: { repo: InsightsRepository; gateway:
       goals,
     });
     const items = await gateway.generateInsights(aggregates);
+    if (items.length === 0) return repo.listActive(householdId);
     return repo.replaceAll({ householdId, period: { start: prevStart, end: nextStart }, items, actorUuid });
   }
 

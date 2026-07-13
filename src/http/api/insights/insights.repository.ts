@@ -55,7 +55,7 @@ export function createInsightsRepository(db: Db): InsightsRepository {
         .select({
           name: sql<string>`coalesce(${category.name}, 'Sem categoria')`,
           kind: sql<"income" | "expense">`coalesce(${category.kind}, case when ${transaction.direction} = 'in' then 'income' else 'expense' end)`,
-          cents: sql<number>`sum(${transaction.amountCents})::int`,
+          cents: sql<number>`sum(${transaction.amountCents})::bigint`,
         })
         .from(transaction)
         .innerJoin(account, eq(account.id, transaction.accountId))
@@ -69,6 +69,7 @@ export function createInsightsRepository(db: Db): InsightsRepository {
           ),
         )
         .groupBy(
+          category.id,
           sql`coalesce(${category.name}, 'Sem categoria')`,
           sql`coalesce(${category.kind}, case when ${transaction.direction} = 'in' then 'income' else 'expense' end)`,
         );
@@ -78,7 +79,7 @@ export function createInsightsRepository(db: Db): InsightsRepository {
     async netAllTime(householdId) {
       const rows = await db
         .select({
-          net: sql<number>`coalesce(sum(case when ${transaction.direction} = 'in' then ${transaction.amountCents} else -${transaction.amountCents} end), 0)::int`,
+          net: sql<number>`coalesce(sum(case when ${transaction.direction} = 'in' then ${transaction.amountCents} else -${transaction.amountCents} end), 0)::bigint`,
         })
         .from(transaction)
         .innerJoin(account, eq(account.id, transaction.accountId))
@@ -115,6 +116,7 @@ export function createInsightsRepository(db: Db): InsightsRepository {
 
     async replaceAll({ householdId, period, items, actorUuid }) {
       return db.transaction(async (tx) => {
+        await tx.execute(sql`select pg_advisory_xact_lock(${householdId})`);
         const now = new Date();
         await tx
           .update(insight)

@@ -1,4 +1,6 @@
 import { z } from "zod/v4";
+import type { InsightKind, InsightSeverity } from "../../infra/db/tables/insights/insight.table.js";
+import { INSIGHT_KINDS, INSIGHT_SEVERITIES } from "../../infra/db/tables/insights/insight.table.js";
 import { logger } from "../../infra/observability/logger.js";
 
 export type CategorizationItem = {
@@ -26,6 +28,36 @@ export type ExtractedRow = {
   occurredAt: string | null; // ISO date (YYYY-MM-DD) if the receipt shows one
 };
 
+export type InsightAggregates = {
+  period: { start: string; end: string };
+  categoryTotals: {
+    name: string;
+    kind: "income" | "expense";
+    currentCents: number;
+    previousCents: number;
+    deltaCents: number;
+  }[];
+  incomeCurrentCents: number;
+  expenseCurrentCents: number;
+  netCurrentCents: number;
+  netAllTimeCents: number;
+  goals: {
+    name: string;
+    type: string;
+    targetCents: number | null;
+    currentCents: number;
+    progressPct: number | null;
+  }[];
+};
+
+export type GeneratedInsight = {
+  kind: InsightKind;
+  severity: InsightSeverity;
+  title: string;
+  body: string;
+  recommendation: string | null;
+};
+
 export interface DeepseekGateway {
   /** False when no API key is configured — callers can skip the round-trip. */
   readonly enabled: boolean;
@@ -35,6 +67,9 @@ export interface DeepseekGateway {
   /** Extract transaction rows from raw OCR text of a receipt/Pix/fatura. Returns []
    *  when disabled or on any failure. */
   extractReceipt(text: string): Promise<ExtractedRow[]>;
+  /** Generate insight cards from period/category/goal aggregates (no individual
+   *  transactions sent). Returns [] when disabled or on any failure. */
+  generateInsights(input: InsightAggregates): Promise<GeneratedInsight[]>;
 }
 
 // Deepseek is OpenAI-compatible. We ask for a strict JSON object and validate it.
@@ -55,6 +90,18 @@ const ReceiptSchema = z.object({
       direction: z.enum(["in", "out"]),
       description: z.string(),
       occurredAt: z.string().nullable(),
+    }),
+  ),
+});
+
+const InsightsSchema = z.object({
+  items: z.array(
+    z.object({
+      kind: z.enum(INSIGHT_KINDS),
+      severity: z.enum(INSIGHT_SEVERITIES),
+      title: z.string().min(1).max(255),
+      body: z.string().min(1),
+      recommendation: z.string().nullable(),
     }),
   ),
 });
@@ -92,6 +139,20 @@ const RECEIPT_PROMPT = [
   "occurredAt é a data no formato ISO YYYY-MM-DD, ou null se não houver.",
   'Responda APENAS JSON: {"items":[{"amountCents":1590,"direction":"out","description":"...","occurredAt":"2024-01-15"}]}.',
 ].join("\n");
+
+function buildInsightsPrompt(a: InsightAggregates): string {
+  return [
+    "Você é um copiloto financeiro em português do Brasil.",
+    "Com base nos AGREGADOS abaixo (sem transações individuais), gere de 3 a 6 insights úteis.",
+    `kind ∈ ${INSIGHT_KINDS.join(", ")}; severity ∈ ${INSIGHT_SEVERITIES.join(", ")}.`,
+    "Use 'advice' + recommendation quando houver uma ação concreta; recommendation=null quando for só informativo.",
+    "Valores estão em centavos. Seja específico e acionável, sem inventar dados fora dos agregados.",
+    'Responda APENAS JSON: {"items":[{"kind":"summary","severity":"positive","title":"...","body":"...","recommendation":null}]}.',
+    "",
+    "AGREGADOS:",
+    JSON.stringify(a),
+  ].join("\n");
+}
 
 export function createDeepseekGateway(opts: {
   apiKey: string | undefined;
@@ -155,6 +216,17 @@ export function createDeepseekGateway(opts: {
       if (!content) return [];
       try {
         const parsed = ReceiptSchema.safeParse(JSON.parse(content));
+        return parsed.success ? parsed.data.items : [];
+      } catch {
+        return [];
+      }
+    },
+    async generateInsights(input) {
+      if (!enabled) return [];
+      const content = await callJson(buildInsightsPrompt(input));
+      if (!content) return [];
+      try {
+        const parsed = InsightsSchema.safeParse(JSON.parse(content));
         return parsed.success ? parsed.data.items : [];
       } catch {
         return [];

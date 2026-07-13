@@ -38,5 +38,23 @@ export function fakeDeepseek(): DeepseekGateway {
     async extractReceipt() {
       return [];
     },
+    async generateInsights(input) {
+      return [
+        {
+          kind: "summary",
+          severity: input.netCurrentCents >= 0 ? "positive" : "warning",
+          title: "Resumo do período",
+          body: `Saldo do período: ${input.netCurrentCents} centavos.`,
+          recommendation: null,
+        },
+        {
+          kind: "advice",
+          severity: "info",
+          title: "Dica",
+          body: "Considere revisar a maior categoria de gasto.",
+          recommendation: "Defina um limite mensal para a categoria de maior gasto.",
+        },
+      ];
+    },
   };
 }

@@ -117,15 +117,13 @@ export function createCommitService(deps: ImportServiceDeps) {
   return async (input: {
     householdId: number;
     accountId: number;
+    source: ImportSource;
     rows: CommitRow[];
     actorUuid: string;
   }): Promise<{ importId: string; imported: number; skipped: number }> => {
     const batch = await deps.importsRepo.createBatch({
       householdId: input.householdId,
-      // Committed batches aggregate already-reviewed rows from any original
-      // source (ofx/csv/receipt); "import" tags them as such at the DB layer,
-      // which currently types this column narrower than the runtime value set.
-      source: "import" as ImportSource,
+      source: input.source,
       actorUuid: input.actorUuid,
     });
     try {

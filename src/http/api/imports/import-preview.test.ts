@@ -46,6 +46,7 @@ describe("commitImport", () => {
     const res = await commit({
       householdId: 1,
       accountId: 9,
+      source: "ofx",
       actorUuid: "actor",
       rows: [
         { amountCents: 4590, direction: "out", occurredAt: "2026-07-15T00:00:00.000Z", description: "iFood", rawRef: "TX1", categoryName: null },

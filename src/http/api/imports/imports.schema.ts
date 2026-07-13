@@ -15,3 +15,41 @@ export const ImportResultView = z.object({
   status: z.enum(["completed", "failed"]),
   transactionCount: z.number().int(),
 });
+
+export const PreviewImportBody = z.object({
+  source: z.enum(IMPORT_SOURCES),
+  accountId: z.uuid(),
+  content: z.string().min(1).max(1_000_000),
+});
+
+export const PreviewRowView = z.object({
+  amountCents: z.number().int(),
+  direction: z.enum(["in", "out"]),
+  occurredAt: z.string(),
+  description: z.string(),
+  rawRef: z.string().nullable(),
+  suggestedCategory: z.string().nullable(),
+  confidence: z.number().int(),
+  duplicate: z.boolean(),
+});
+export const PreviewImportResponse = z.object({ rows: z.array(PreviewRowView) });
+
+export const CommitImportBody = z.object({
+  source: z.enum(IMPORT_SOURCES),
+  accountId: z.uuid(),
+  rows: z.array(
+    z.object({
+      amountCents: z.number().int(),
+      direction: z.enum(["in", "out"]),
+      occurredAt: z.string(),
+      description: z.string().min(1).max(512),
+      rawRef: z.string().nullable(),
+      categoryName: z.string().nullable(),
+    }),
+  ),
+});
+export const CommitImportResponse = z.object({
+  importId: z.uuid(),
+  imported: z.number().int(),
+  skipped: z.number().int(),
+});

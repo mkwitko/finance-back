@@ -6,6 +6,7 @@ import { authRoutes } from "./api/auth/index.js";
 import { categoriesRoutes } from "./api/categories/index.js";
 import { householdsRoutes } from "./api/households/index.js";
 import { importsRoutes } from "./api/imports/index.js";
+import { insightsRoutes } from "./api/insights/index.js";
 import { invitationsRoutes } from "./api/invitations/index.js";
 import { meRoutes } from "./api/me/index.js";
 import { membersRoutes } from "./api/households/members.routes.js";
@@ -47,4 +48,5 @@ export const httpRoutes: FastifyPluginAsync = async (app) => {
   await app.register(categoriesRoutes);
   await app.register(transactionsRoutes);
   await app.register(importsRoutes);
+  await app.register(insightsRoutes);
 };

@@ -1,0 +1,19 @@
+{
+  "AUTH-T0001": "Token de autenticação ausente.",
+  "AUTH-T0002": "Token inválido.",
+  "AUTH-T0003": "Token expirado.",
+  "AUTH-T0004": "Falha ao verificar o login com o Google.",
+  "AUTH-T0005": "Refresh token inválido.",
+  "AUTH-T0006": "Refresh token revogado.",
+  "AUTH-T0007": "Refresh token expirado.",
+  "AUTH-T0008": "Usuário não encontrado.",
+  "HH-T0001": "Nenhum núcleo financeiro ativo selecionado.",
+  "HH-T0002": "Você não é membro deste núcleo.",
+  "HH-T0003": "Seu papel não permite esta ação.",
+  "HH-T0004": "Núcleo financeiro não encontrado.",
+  "RES-T0001": "Recurso não encontrado.",
+  "SYS-T0001": "Erro interno do servidor.",
+  "SYS-T0002": "Dados de entrada inválidos.",
+  "SYS-T0003": "Muitas requisições. Tente novamente em instantes.",
+  "SYS-T0004": "Serviço temporariamente indisponível."
+}

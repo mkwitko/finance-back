@@ -1,0 +1,47 @@
+import type { FastifyRequest, preHandlerHookHandler } from "fastify";
+import { db } from "../../../infra/db/client.js";
+import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
+import { ERRORS } from "../../../shared/errors/catalog.js";
+import type { HouseholdContext } from "../../../types/household.js";
+import { createHouseholdsRepository } from "../../api/households/households.repository.js";
+import { requireUser } from "../auth/auth.js";
+
+// Roles ordered by power. `requireHousehold(min)` passes when the caller's rank is
+// >= the required rank (owner clears everything, viewer clears only viewer-level).
+const ROLE_RANK: Record<MembershipRole, number> = {
+  owner: 4,
+  adult: 3,
+  teen: 2,
+  child: 1,
+  viewer: 0,
+};
+
+const HOUSEHOLD_HEADER = "x-household-id";
+
+/** Guarantee a resolved household context inside a handler. */
+export function requireHousehold(req: FastifyRequest): HouseholdContext {
+  if (!req.household) throw ERRORS.HOUSEHOLD.MISSING_CONTEXT();
+  return req.household;
+}
+
+/**
+ * preHandler factory that resolves the active household from the `x-household-id`
+ * header, verifies the caller is a member, enforces a minimum role, and attaches
+ * `req.household`. Runs AFTER the global auth hook, so `req.user` is populated.
+ */
+export function requireHouseholdRole(minRole: MembershipRole = "viewer"): preHandlerHookHandler {
+  const repo = createHouseholdsRepository(db);
+  return async (req) => {
+    const user = requireUser(req);
+    const householdUuid = req.headers[HOUSEHOLD_HEADER];
+    if (typeof householdUuid !== "string" || householdUuid.length === 0) {
+      throw ERRORS.HOUSEHOLD.MISSING_CONTEXT();
+    }
+
+    const ctx = await repo.findMembershipContext({ userUuid: user.sub, householdUuid });
+    if (!ctx) throw ERRORS.HOUSEHOLD.NOT_A_MEMBER();
+    if (ROLE_RANK[ctx.role] < ROLE_RANK[minRole]) throw ERRORS.HOUSEHOLD.INSUFFICIENT_ROLE();
+
+    req.household = ctx;
+  };
+}

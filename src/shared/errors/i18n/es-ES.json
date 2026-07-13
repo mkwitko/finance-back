@@ -1,0 +1,19 @@
+{
+  "AUTH-T0001": "Falta el token de autenticación.",
+  "AUTH-T0002": "Token inválido.",
+  "AUTH-T0003": "Token expirado.",
+  "AUTH-T0004": "Error al verificar el inicio de sesión con Google.",
+  "AUTH-T0005": "Refresh token inválido.",
+  "AUTH-T0006": "Refresh token revocado.",
+  "AUTH-T0007": "Refresh token expirado.",
+  "AUTH-T0008": "Usuario no encontrado.",
+  "HH-T0001": "No hay núcleo financiero activo seleccionado.",
+  "HH-T0002": "No eres miembro de este núcleo.",
+  "HH-T0003": "Tu rol no permite esta acción.",
+  "HH-T0004": "Núcleo financiero no encontrado.",
+  "RES-T0001": "Recurso no encontrado.",
+  "SYS-T0001": "Error interno del servidor.",
+  "SYS-T0002": "Datos de entrada inválidos.",
+  "SYS-T0003": "Demasiadas solicitudes. Inténtalo de nuevo en unos instantes.",
+  "SYS-T0004": "Servicio temporalmente no disponible."
+}

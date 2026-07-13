@@ -1,0 +1,19 @@
+{
+  "AUTH-T0001": "Missing authentication token.",
+  "AUTH-T0002": "Invalid token.",
+  "AUTH-T0003": "Token expired.",
+  "AUTH-T0004": "Failed to verify Google sign-in.",
+  "AUTH-T0005": "Invalid refresh token.",
+  "AUTH-T0006": "Refresh token revoked.",
+  "AUTH-T0007": "Refresh token expired.",
+  "AUTH-T0008": "User not found.",
+  "HH-T0001": "No active household selected.",
+  "HH-T0002": "You are not a member of this household.",
+  "HH-T0003": "Your role does not allow this action.",
+  "HH-T0004": "Household not found.",
+  "RES-T0001": "Resource not found.",
+  "SYS-T0001": "Internal server error.",
+  "SYS-T0002": "Invalid input.",
+  "SYS-T0003": "Too many requests. Please try again shortly.",
+  "SYS-T0004": "Service temporarily unavailable."
+}

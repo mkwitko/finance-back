@@ -26,6 +26,6 @@ describe("buildAggregates", () => {
       period: { start: "a", end: "b" }, current: [], previous: [], netAllTimeCents: 0,
       goals: [{ name: "X", type: "trip", targetCents: null, currentCents: 100 }],
     });
-    expect(out.goals[0].progressPct).toBeNull();
+    expect(out.goals[0]!.progressPct).toBeNull();
   });
 });

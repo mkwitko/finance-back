@@ -49,7 +49,7 @@ export const invitationsRoutes: FastifyPluginAsync = async (app) => {
       if (ROLE_RANK[req.body.role] > ROLE_RANK[hh.role]) throw ERRORS.INVITATION.ROLE_TOO_HIGH();
       const expiresAt = new Date(Date.now() + req.body.expiresInHours * 3600_000);
       const created = await invites.create({
-        householdId: hh.id,
+        householdId: hh.uuid,
         role: req.body.role,
         expiresAt,
         actorUuid: requireUser(req).sub,
@@ -71,7 +71,7 @@ export const invitationsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const list = await invites.listActive(hh.id);
+      const list = await invites.listActive(hh.uuid);
       return reply.code(200).send({ invitations: list.map((i) => present(i, JOIN_LINK)) });
     },
   );
@@ -91,7 +91,7 @@ export const invitationsRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const hh = requireHousehold(req);
       const ok = await invites.revoke({
-        householdId: hh.id,
+        householdId: hh.uuid,
         invitationUuid: (req.params as { invId: string }).invId,
         actorUuid: requireUser(req).sub,
       });
@@ -119,15 +119,15 @@ export const invitationsRoutes: FastifyPluginAsync = async (app) => {
       if (!invite) throw ERRORS.INVITATION.EXPIRED();
       const user = await users.findByUuid(auth.sub);
       if (!user) throw ERRORS.AUTH.USER_NOT_FOUND();
-      const existing = await members.findMember(invite.householdDbId, auth.sub);
+      const existing = await members.findMember(invite.householdUuid, auth.sub);
       if (existing) throw ERRORS.INVITATION.ALREADY_MEMBER();
       await households.addMember({
-        householdId: invite.householdDbId,
-        userId: user.id,
+        householdId: invite.householdUuid,
+        userId: user.uuid,
         role: invite.role,
         actorUuid: auth.sub,
       });
-      await syncSeatsSafe(app, { id: invite.householdDbId, uuid: invite.householdUuid });
+      await syncSeatsSafe(app, { uuid: invite.householdUuid });
       const joined = await households
         .listForUser(auth.sub)
         .then((hs) => hs.find((h) => h.uuid === invite.householdUuid));

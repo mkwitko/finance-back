@@ -1,11 +1,6 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import type { Invitation as InvitationRow } from "@prisma/client";
 import type { MembershipRole } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import { household } from "../../../infra/db/tables/households/household.table.js";
-import {
-  type InvitationRow,
-  invitation,
-} from "../../../infra/db/tables/households/invitation.table.js";
 import { generateInviteCode } from "./code.js";
 
 export type Invitation = {
@@ -28,17 +23,15 @@ function toDomain(row: InvitationRow): Invitation {
 
 export interface InvitationsRepository {
   create(args: {
-    householdId: number;
+    householdId: string;
     role: MembershipRole;
     expiresAt: Date;
     actorUuid: string;
   }): Promise<Invitation>;
-  listActive(householdId: number): Promise<Invitation[]>;
-  findActiveByCode(
-    code: string,
-  ): Promise<(Invitation & { householdDbId: number; householdUuid: string }) | null>;
+  listActive(householdId: string): Promise<Invitation[]>;
+  findActiveByCode(code: string): Promise<(Invitation & { householdUuid: string }) | null>;
   revoke(args: {
-    householdId: number;
+    householdId: string;
     invitationUuid: string;
     actorUuid: string;
   }): Promise<boolean>;
@@ -47,27 +40,23 @@ export interface InvitationsRepository {
 export function createInvitationsRepository(db: Db): InvitationsRepository {
   return {
     async create({ householdId, role, expiresAt, actorUuid }) {
-      const now = new Date();
       for (let attempt = 0; attempt < 5; attempt++) {
         try {
-          const inserted = await db
-            .insert(invitation)
-            .values({
+          const row = await db.invitation.create({
+            data: {
               householdId,
               code: generateInviteCode(),
               role,
               expiresAt,
               createdBy: actorUuid,
               updatedBy: actorUuid,
-              createdAt: now,
-              updatedAt: now,
-            })
-            .returning();
-          return toDomain(inserted[0] as InvitationRow);
+            },
+          });
+          return toDomain(row);
         } catch (err) {
           // Unique-code collision → retry with a fresh code. Anything else rethrows.
           const pgCode = (err as { code?: string })?.code;
-          if (pgCode !== "23505") throw err;
+          if (pgCode !== "P2002") throw err;
           if (attempt === 4) throw err;
         }
       }
@@ -75,50 +64,40 @@ export function createInvitationsRepository(db: Db): InvitationsRepository {
     },
 
     async listActive(householdId) {
-      const rows = await db
-        .select()
-        .from(invitation)
-        .where(
-          and(
-            eq(invitation.householdId, householdId),
-            isNull(invitation.revokedAt),
-            isNull(invitation.deletedAt),
-            gt(invitation.expiresAt, new Date()),
-          ),
-        );
+      const rows = await db.invitation.findMany({
+        where: {
+          householdId,
+          revokedAt: null,
+          deletedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      });
       return rows.map(toDomain);
     },
 
     async findActiveByCode(code) {
-      const rows = await db
-        .select({ inv: invitation, householdUuid: household.uuid })
-        .from(invitation)
-        .innerJoin(household, eq(household.id, invitation.householdId))
-        .where(
-          and(
-            eq(invitation.code, code),
-            isNull(invitation.revokedAt),
-            isNull(invitation.deletedAt),
-            gt(invitation.expiresAt, new Date()),
-          ),
-        )
-        .limit(1);
-      const r = rows[0];
-      if (!r) return null;
+      const row = await db.invitation.findFirst({
+        where: {
+          code,
+          revokedAt: null,
+          deletedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        include: { household: { select: { uuid: true } } },
+      });
+      if (!row) return null;
       return {
-        ...toDomain(r.inv),
-        householdDbId: r.inv.householdId,
-        householdUuid: r.householdUuid,
+        ...toDomain(row),
+        householdUuid: row.household.uuid,
       };
     },
 
     async revoke({ householdId, invitationUuid, actorUuid }) {
-      const res = await db
-        .update(invitation)
-        .set({ revokedAt: new Date(), updatedBy: actorUuid, updatedAt: new Date() })
-        .where(and(eq(invitation.householdId, householdId), eq(invitation.uuid, invitationUuid)))
-        .returning({ id: invitation.id });
-      return res.length > 0;
+      const res = await db.invitation.updateMany({
+        where: { householdId, uuid: invitationUuid },
+        data: { revokedAt: new Date(), updatedBy: actorUuid, updatedAt: new Date() },
+      });
+      return res.count > 0;
     },
   };
 }

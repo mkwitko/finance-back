@@ -1,13 +1,10 @@
-import { desc, eq, isNull } from "drizzle-orm";
+import type { User as UserRow } from "@prisma/client";
 import type { Db } from "../../../infra/db/client.js";
-import type { UserRow } from "../../../infra/db/tables/users/user.table.js";
-import { user } from "../../../infra/db/tables/users/user.table.js";
 import { SYSTEM_ACTOR_UUID } from "../../../shared/constants/system-actor.js";
 import type { UpsertGoogleUserInput, User } from "./users.types.js";
 
 function toDomain(row: UserRow): User {
   return {
-    id: row.id,
     uuid: row.uuid,
     email: row.email,
     name: row.name,
@@ -21,7 +18,7 @@ function toDomain(row: UserRow): User {
 export interface UsersRepository {
   /** Upsert by Google `sub` (first-access users are stamped by the SYSTEM actor). */
   upsertByGoogle(input: UpsertGoogleUserInput): Promise<User>;
-  findById(id: number): Promise<User | null>;
+  findById(uuid: string): Promise<User | null>;
   findByUuid(uuid: string): Promise<User | null>;
   listUsers(args: { limit: number }): Promise<User[]>;
 }
@@ -29,33 +26,9 @@ export interface UsersRepository {
 export function createUsersRepository(db: Db): UsersRepository {
   return {
     async upsertByGoogle(input) {
-      const existing = await db
-        .select()
-        .from(user)
-        .where(eq(user.googleSub, input.googleSub))
-        .limit(1);
-
-      const now = new Date();
-      const current = existing[0];
-      if (current) {
-        const updated = await db
-          .update(user)
-          .set({
-            email: input.email,
-            name: input.name,
-            picture: input.picture,
-            emailVerified: input.emailVerified,
-            updatedAt: now,
-            updatedBy: SYSTEM_ACTOR_UUID,
-          })
-          .where(eq(user.id, current.id))
-          .returning();
-        return toDomain(updated[0] as UserRow);
-      }
-
-      const inserted = await db
-        .insert(user)
-        .values({
+      const row = await db.user.upsert({
+        where: { googleSub: input.googleSub },
+        create: {
           googleSub: input.googleSub,
           email: input.email,
           name: input.name,
@@ -63,30 +36,34 @@ export function createUsersRepository(db: Db): UsersRepository {
           emailVerified: input.emailVerified,
           createdBy: SYSTEM_ACTOR_UUID,
           updatedBy: SYSTEM_ACTOR_UUID,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      return toDomain(inserted[0] as UserRow);
+        },
+        update: {
+          email: input.email,
+          name: input.name,
+          picture: input.picture,
+          emailVerified: input.emailVerified,
+          updatedBy: SYSTEM_ACTOR_UUID,
+        },
+      });
+      return toDomain(row);
     },
 
-    async findById(id) {
-      const rows = await db.select().from(user).where(eq(user.id, id)).limit(1);
-      return rows[0] ? toDomain(rows[0]) : null;
+    async findById(uuid) {
+      const row = await db.user.findUnique({ where: { uuid } });
+      return row ? toDomain(row) : null;
     },
 
     async findByUuid(uuid) {
-      const rows = await db.select().from(user).where(eq(user.uuid, uuid)).limit(1);
-      return rows[0] ? toDomain(rows[0]) : null;
+      const row = await db.user.findUnique({ where: { uuid } });
+      return row ? toDomain(row) : null;
     },
 
     async listUsers({ limit }) {
-      const rows = await db
-        .select()
-        .from(user)
-        .where(isNull(user.deletedAt))
-        .orderBy(desc(user.createdAt), desc(user.id))
-        .limit(limit);
+      const rows = await db.user.findMany({
+        where: { deletedAt: null },
+        orderBy: [{ createdAt: "desc" }, { uuid: "desc" }],
+        take: limit,
+      });
       return rows.map(toDomain);
     },
   };

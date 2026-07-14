@@ -33,7 +33,7 @@ export function createDevLoginService(deps: DevLoginDeps) {
 
     const refreshToken = generateRefreshToken();
     await deps.authRepo.insertRefreshToken({
-      userId: user.id,
+      userId: user.uuid,
       tokenHash: hashToken(refreshToken),
       expiresAt: new Date(Date.now() + deps.refreshTtlSeconds * 1000),
       actorUuid: user.uuid,

@@ -95,10 +95,8 @@ export function createStripeGateway(opts: { secretKey: string; publishableKey: s
     createEphemeralKey(customerId) {
       return wrap(async (c) => {
         const key = await c.ephemeralKeys.create({ customer: customerId }, { apiVersion: API_VERSION });
-        // `secret` is typed optional in the installed SDK (22.3.1) but Stripe always
-        // returns it on a successful create; fall back defensively rather than widen
-        // the interface's return type to `string | undefined`.
-        return key.secret ?? "";
+        if (!key.secret) throw ERRORS.SUB.STRIPE_ERROR();
+        return key.secret;
       });
     },
     createSubscription({ customerId, priceId, quantity, householdId }) {

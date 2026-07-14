@@ -5,7 +5,7 @@ import { createSubscriptionsData } from "./subscriptions.data.js";
 import { createSubscriptionsService } from "./subscriptions.service.js";
 
 /** Best-effort: never throws. Read-time GET stays correct even if this drifts. */
-export async function syncSeatsSafe(app: FastifyInstance, ctx: { id: number; uuid: string }): Promise<void> {
+export async function syncSeatsSafe(app: FastifyInstance, ctx: { uuid: string }): Promise<void> {
   try {
     const svc = createSubscriptionsService({ stripe: app.gateways.stripe, data: createSubscriptionsData(db) });
     await svc.syncSeats(ctx);

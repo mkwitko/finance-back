@@ -27,12 +27,12 @@ export type CheckoutSession = {
   publishableKey: string;
 };
 export type SubscriptionsService = {
-  get(ctx: { id: number; uuid: string }): Promise<SubscriptionView>;
-  checkout(ctx: { id: number; uuid: string }, interval: BillingInterval): Promise<CheckoutSession>;
-  switchInterval(ctx: { id: number; uuid: string }, interval: BillingInterval): Promise<SubscriptionView>;
-  cancel(ctx: { id: number; uuid: string }): Promise<SubscriptionView>;
-  syncSeats(ctx: { id: number; uuid: string }): Promise<void>;
-  transferOwner(ctx: { id: number; uuid: string }, newOwnerEmail: string): Promise<void>;
+  get(ctx: { uuid: string }): Promise<SubscriptionView>;
+  checkout(ctx: { uuid: string }, interval: BillingInterval): Promise<CheckoutSession>;
+  switchInterval(ctx: { uuid: string }, interval: BillingInterval): Promise<SubscriptionView>;
+  cancel(ctx: { uuid: string }): Promise<SubscriptionView>;
+  syncSeats(ctx: { uuid: string }): Promise<void>;
+  transferOwner(ctx: { uuid: string }, newOwnerEmail: string): Promise<void>;
 };
 
 const FREE: SubscriptionView = {
@@ -50,14 +50,14 @@ export function createSubscriptionsService(deps: {
 }): SubscriptionsService {
   const { stripe, data } = deps;
 
-  async function requireOwnerEmail(householdId: number): Promise<string> {
-    const email = await data.ownerEmail(householdId);
+  async function requireOwnerEmail(householdUuid: string): Promise<string> {
+    const email = await data.ownerEmail(householdUuid);
     if (!email) throw ERRORS.SUB.NO_OWNER();
     return email;
   }
 
-  async function liveSub(ctx: { id: number; uuid: string }) {
-    const email = await data.ownerEmail(ctx.id);
+  async function liveSub(ctx: { uuid: string }) {
+    const email = await data.ownerEmail(ctx.uuid);
     if (!email) return null;
     const customerId = await stripe.findCustomerByEmail(email);
     if (!customerId) return null;
@@ -85,7 +85,7 @@ export function createSubscriptionsService(deps: {
     },
 
     async checkout(ctx, interval) {
-      const email = await requireOwnerEmail(ctx.id);
+      const email = await requireOwnerEmail(ctx.uuid);
       const customerId = await stripe.ensureCustomer(email);
       const existing = await stripe.getHouseholdSubscription(customerId, ctx.uuid);
       if (existing) {
@@ -103,7 +103,7 @@ export function createSubscriptionsService(deps: {
         }
         throw ERRORS.SUB.ALREADY_SUBSCRIBED();
       }
-      const quantity = await data.countActiveMembers(ctx.id);
+      const quantity = await data.countActiveMembers(ctx.uuid);
       const priceId = priceIdForInterval(interval);
       const ephemeralKeySecret = await stripe.createEphemeralKey(customerId);
       const { paymentIntentClientSecret } = await stripe.createSubscription({
@@ -134,7 +134,7 @@ export function createSubscriptionsService(deps: {
     async syncSeats(ctx) {
       const found = await liveSub(ctx);
       if (!found) return; // free household: nothing to sync
-      const quantity = await data.countActiveMembers(ctx.id);
+      const quantity = await data.countActiveMembers(ctx.uuid);
       if (quantity !== found.sub.quantity) {
         await stripe.setQuantity(found.sub.id, found.sub.itemId, quantity);
       }

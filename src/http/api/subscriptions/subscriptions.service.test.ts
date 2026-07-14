@@ -10,7 +10,7 @@ function fakeData(overrides: Partial<SubscriptionsData> = {}): SubscriptionsData
     ...overrides,
   };
 }
-const ctx = { id: 1, uuid: "hh-uuid-1" };
+const ctx = { uuid: "hh-uuid-1" };
 
 beforeEach(() => {
   process.env.STRIPE_PRICE_PREMIUM_MONTHLY = "price_m";

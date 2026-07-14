@@ -17,7 +17,7 @@ export const subscriptionsRoutes: FastifyPluginAsync = async (app) => {
     schema: { operationId: "getSubscription", tags: ["subscriptions"], summary: "Get subscription + entitlements", params, response: { 200: SubscriptionView } },
   }, async (req, reply) => {
     const hh = requireHousehold(req);
-    return reply.code(200).send(await svc().get({ id: hh.id, uuid: hh.uuid }));
+    return reply.code(200).send(await svc().get({ uuid: hh.uuid }));
   });
 
   app.withTypeProvider<ZodTypeProvider>().post("/households/:id/subscription/checkout", {
@@ -25,7 +25,7 @@ export const subscriptionsRoutes: FastifyPluginAsync = async (app) => {
     schema: { operationId: "checkoutSubscription", tags: ["subscriptions"], summary: "Start a subscription (PaymentSheet)", params, body: CheckoutBody, response: { 200: CheckoutSessionView } },
   }, async (req, reply) => {
     const hh = requireHousehold(req);
-    return reply.code(200).send(await svc().checkout({ id: hh.id, uuid: hh.uuid }, req.body.interval));
+    return reply.code(200).send(await svc().checkout({ uuid: hh.uuid }, req.body.interval));
   });
 
   app.withTypeProvider<ZodTypeProvider>().post("/households/:id/subscription/switch", {
@@ -33,7 +33,7 @@ export const subscriptionsRoutes: FastifyPluginAsync = async (app) => {
     schema: { operationId: "switchSubscriptionInterval", tags: ["subscriptions"], summary: "Switch monthly/annual", params, body: CheckoutBody, response: { 200: SubscriptionView } },
   }, async (req, reply) => {
     const hh = requireHousehold(req);
-    return reply.code(200).send(await svc().switchInterval({ id: hh.id, uuid: hh.uuid }, req.body.interval));
+    return reply.code(200).send(await svc().switchInterval({ uuid: hh.uuid }, req.body.interval));
   });
 
   app.withTypeProvider<ZodTypeProvider>().post("/households/:id/subscription/cancel", {
@@ -41,6 +41,6 @@ export const subscriptionsRoutes: FastifyPluginAsync = async (app) => {
     schema: { operationId: "cancelSubscription", tags: ["subscriptions"], summary: "Cancel at period end", params, response: { 200: SubscriptionView } },
   }, async (req, reply) => {
     const hh = requireHousehold(req);
-    return reply.code(200).send(await svc().cancel({ id: hh.id, uuid: hh.uuid }));
+    return reply.code(200).send(await svc().cancel({ uuid: hh.uuid }));
   });
 };

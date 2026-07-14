@@ -24,6 +24,13 @@ const EnvSchema = z.object({
   DEEPSEEK_BASE_URL: z.string().default("https://api.deepseek.com"),
   DEEPSEEK_MODEL: z.string().default("deepseek-chat"),
 
+  // Stripe billing. Empty by default so local dev / tests boot without real keys;
+  // the Stripe gateway degrades (throws a typed error) when the secret is empty.
+  STRIPE_SECRET_KEY: z.string().default(""),
+  STRIPE_PUBLISHABLE_KEY: z.string().default(""),
+  STRIPE_PRICE_PREMIUM_MONTHLY: z.string().default(""),
+  STRIPE_PRICE_PREMIUM_ANNUAL: z.string().default(""),
+
   CORS_ALLOWED_ORIGINS: z.string().optional(),
 
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(300),

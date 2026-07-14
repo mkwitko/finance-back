@@ -27,6 +27,10 @@ describe("subscription e2e (stripe-faked)", () => {
     expect(co.json()).toMatchObject({ publishableKey: "pk_fake" });
     expect(co.json().paymentIntentClientSecret).toContain("pi_fake");
 
+    // Simulate the mobile PaymentSheet confirming payment: the freshly created sub
+    // is "incomplete" until then (payment_behavior: default_incomplete).
+    (h.app.gateways.stripe as any).confirmAll();
+
     const prem = await h.app.inject({ method: "GET", url: `/households/${id}/subscription`, headers: s });
     expect(prem.json()).toMatchObject({ plan: "premium", status: "active", interval: "monthly", entitlements: { aiInsights: true } });
 

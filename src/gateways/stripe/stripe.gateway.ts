@@ -26,6 +26,7 @@ export interface StripeGateway {
     householdId: string;
   }): Promise<{ paymentIntentClientSecret: string | null }>;
   getHouseholdSubscription(customerId: string, householdId: string): Promise<StripeSubscriptionView | null>;
+  getSubscriptionClientSecret(subId: string): Promise<string | null>;
   switchPrice(subId: string, itemId: string, priceId: string): Promise<void>;
   setQuantity(subId: string, itemId: string, quantity: number): Promise<void>;
   cancelAtPeriodEnd(subId: string): Promise<void>;
@@ -125,6 +126,19 @@ export function createStripeGateway(opts: { secretKey: string; publishableKey: s
           (s) => s.metadata?.householdId === householdId && s.status !== "canceled" && s.status !== "incomplete_expired",
         );
         return live ? toView(live) : null;
+      });
+    },
+    getSubscriptionClientSecret(subId) {
+      return wrap(async (c) => {
+        const sub = await c.subscriptions.retrieve(subId, { expand: ["latest_invoice.payment_intent"] });
+        const invoice = sub.latest_invoice as Stripe.Invoice | null;
+        // Same narrow cast as createSubscription: `payment_intent` on an expanded
+        // invoice is typed as `string | Stripe.PaymentIntent | null` (or absent),
+        // depending on SDK/type-version drift.
+        const pi = (invoice as unknown as { payment_intent?: Stripe.PaymentIntent | string | null } | null)
+          ?.payment_intent;
+        const clientSecret = pi && typeof pi === "object" ? pi.client_secret : null;
+        return clientSecret ?? null;
       });
     },
     switchPrice(subId, itemId, priceId) {

@@ -64,9 +64,18 @@ export function fakeDeepseek(): DeepseekGateway {
 // In-memory fake Stripe gateway. Keyed by email -> customerId; one live sub per
 // (customerId, householdId). Good enough for exercising billing flows without a
 // network call.
-export function fakeStripe(): StripeGateway {
+//
+// Mirrors real Stripe's `payment_behavior: "default_incomplete"`: a freshly created
+// subscription starts in status "incomplete" and only becomes "active" once the
+// client confirms the PaymentIntent (PaymentSheet). Tests simulate that
+// confirmation via the extra `confirmSubscription`/`confirmAll` methods below
+// (not part of the `StripeGateway` interface — cast to reach them).
+export function fakeStripe(): StripeGateway & { confirmSubscription(subId: string): void; confirmAll(): void } {
   const customers = new Map<string, string>(); // email -> customerId
-  const subs = new Map<string, StripeSubscriptionView & { customerId: string; householdId: string }>();
+  const subs = new Map<
+    string,
+    StripeSubscriptionView & { customerId: string; householdId: string; clientSecret: string | null }
+  >();
   let seq = 0;
   const custId = (email: string) => {
     const existing = customers.get(email);
@@ -99,24 +108,40 @@ export function fakeStripe(): StripeGateway {
     },
     async createSubscription({ customerId, priceId, quantity, householdId }) {
       const id = `sub_fake_${++seq}`;
+      const clientSecret = `pi_fake_${seq}_secret`;
       subs.set(id, {
         id,
         itemId: `si_fake_${seq}`,
         priceId,
-        status: "active",
+        status: "incomplete",
         quantity,
         currentPeriodEnd: "2099-01-01T00:00:00.000Z",
         cancelAtPeriodEnd: false,
         customerId,
         householdId,
+        clientSecret,
       });
-      return { paymentIntentClientSecret: `pi_fake_${seq}_secret` };
+      return { paymentIntentClientSecret: clientSecret };
     },
     async getHouseholdSubscription(customerId, householdId) {
       const s = findKey(customerId, householdId);
       if (!s) return null;
-      const { customerId: _c, householdId: _h, ...view } = s;
+      const { customerId: _c, householdId: _h, clientSecret: _cs, ...view } = s;
       return view;
+    },
+    async getSubscriptionClientSecret(subId) {
+      return subs.get(subId)?.clientSecret ?? null;
+    },
+    // TEST-ONLY: simulates the mobile PaymentSheet confirming payment, which is
+    // what flips a real Stripe subscription from "incomplete" to "active".
+    confirmSubscription(subId: string) {
+      const s = subs.get(subId);
+      if (s) s.status = "active";
+    },
+    confirmAll() {
+      for (const s of subs.values()) {
+        if (s.status !== "canceled") s.status = "active";
+      }
     },
     async switchPrice(subId, _itemId, priceId) {
       const s = subs.get(subId);

@@ -37,26 +37,46 @@ describe("subscriptions service", () => {
     const stripe = fakeStripe();
     const svc = createSubscriptionsService({ stripe, data: fakeData() });
     await svc.checkout(ctx, "annual");
+    // freshly created sub is "incomplete" (payment_behavior: default_incomplete) —
+    // not entitled until the PaymentSheet confirms.
+    const before = await svc.get(ctx);
+    expect(before).toMatchObject({ plan: "premium", status: "expired", entitlements: { aiInsights: false } });
+    (stripe as any).confirmAll();
     const v = await svc.get(ctx);
     expect(v).toMatchObject({ plan: "premium", status: "active", interval: "annual", entitlements: { aiInsights: true } });
   });
 
   it("checkout throws ALREADY_SUBSCRIBED when a live sub exists", async () => {
-    const svc = createSubscriptionsService({ stripe: fakeStripe(), data: fakeData() });
+    const stripe = fakeStripe();
+    const svc = createSubscriptionsService({ stripe, data: fakeData() });
     await svc.checkout(ctx, "monthly");
+    (stripe as any).confirmAll();
     await expect(svc.checkout(ctx, "monthly")).rejects.toMatchObject({ code: "SUB-T0003" });
   });
 
+  it("checkout while incomplete reuses the client secret (no 409)", async () => {
+    const stripe = fakeStripe();
+    const svc = createSubscriptionsService({ stripe, data: fakeData() });
+    const first = await svc.checkout(ctx, "monthly");
+    const second = await svc.checkout(ctx, "monthly");
+    expect(second.paymentIntentClientSecret).toBe(first.paymentIntentClientSecret);
+    expect(second.paymentIntentClientSecret).toContain("pi_fake");
+  });
+
   it("switchInterval swaps the price", async () => {
-    const svc = createSubscriptionsService({ stripe: fakeStripe(), data: fakeData() });
+    const stripe = fakeStripe();
+    const svc = createSubscriptionsService({ stripe, data: fakeData() });
     await svc.checkout(ctx, "monthly");
+    (stripe as any).confirmAll();
     const v = await svc.switchInterval(ctx, "annual");
     expect(v.interval).toBe("annual");
   });
 
   it("cancel sets cancelAtPeriodEnd but keeps entitlements until period end", async () => {
-    const svc = createSubscriptionsService({ stripe: fakeStripe(), data: fakeData() });
+    const stripe = fakeStripe();
+    const svc = createSubscriptionsService({ stripe, data: fakeData() });
     await svc.checkout(ctx, "monthly");
+    (stripe as any).confirmAll();
     const v = await svc.cancel(ctx);
     expect(v.cancelAtPeriodEnd).toBe(true);
     expect(v.entitlements.aiInsights).toBe(true); // still active until currentPeriodEnd

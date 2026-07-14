@@ -1,7 +1,7 @@
 # finance-back
 
 Finance backend API. Node.js 22 + Fastify 5 + TypeScript (strict), Zod 4 +
-`fastify-type-provider-zod`, Drizzle + `pg` on PostgreSQL 16, vertical-slice
+`fastify-type-provider-zod`, Prisma 6 on PostgreSQL 16, vertical-slice
 architecture, Pino logs, typed error catalog, Vitest tests. Follows the
 `b2b-reservas-backend` company standard (see `skills/`).
 
@@ -20,7 +20,9 @@ architecture, Pino logs, typed error catalog, Vitest tests. Follows the
 cp .env.example .env            # fill JWT_SECRET + GOOGLE_CLIENT_IDS
 pnpm install
 pnpm dev:db                     # start Postgres (docker compose)
-pnpm db:migrate                 # apply migrations
+pnpm prisma:generate            # generate the Prisma client
+pnpm db:migrate                 # apply migrations (prisma migrate dev)
+pnpm db:seed                    # seed baseline data (SYSTEM actor, etc.)
 pnpm dev:native                 # start API with hot reload (tsx watch)
 # or: pnpm dev                  # docker compose up postgres + API
 ```
@@ -38,7 +40,9 @@ pnpm dev:native                 # start API with hot reload (tsx watch)
 | `pnpm typecheck` | `tsc --noEmit` (strict) |
 | `pnpm check` / `pnpm check:fix` | Biome lint + format |
 | `pnpm test:unit` / `pnpm test:e2e` / `pnpm test` | Vitest |
-| `pnpm db:generate` / `pnpm db:migrate` | Drizzle migrations |
+| `pnpm db:migrate` / `pnpm db:deploy` | Prisma migrations (`prisma migrate dev` / `prisma migrate deploy`) |
+| `pnpm prisma:generate` / `pnpm prisma:validate` | Generate / validate the Prisma client & schema |
+| `pnpm db:seed` | Seed baseline data (`tsx scripts/seed.ts`) |
 
 ## Auth contract (shared with the Expo mobile app)
 

@@ -19,7 +19,7 @@ export function createRefreshService(deps: RefreshDeps) {
     if (stored.revokedAt) throw ERRORS.AUTH.REFRESH_TOKEN_REVOKED();
     if (stored.expiresAt.getTime() <= Date.now()) throw ERRORS.AUTH.REFRESH_TOKEN_EXPIRED();
 
-    const user = await deps.usersRepo.findById(stored.userId);
+    const user = await deps.usersRepo.findByUuid(stored.userId);
     if (!user) throw ERRORS.AUTH.USER_NOT_FOUND();
 
     // Rotate: revoke the presented token and issue a fresh pair.

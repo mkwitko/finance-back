@@ -17,9 +17,8 @@ const USER: User = {
 
 function makeDeps(stored: StoredRefreshToken | null) {
   const usersRepo = {
-    findById: vi.fn(async () => USER),
     upsertByGoogle: vi.fn(),
-    findByUuid: vi.fn(),
+    findByUuid: vi.fn(async () => USER),
     listUsers: vi.fn(),
   } as unknown as UsersRepository;
   const authRepo = {

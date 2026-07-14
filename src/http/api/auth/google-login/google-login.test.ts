@@ -29,7 +29,6 @@ function makeDeps() {
   };
   const usersRepo = {
     upsertByGoogle: vi.fn(async () => USER),
-    findById: vi.fn(),
     findByUuid: vi.fn(),
     listUsers: vi.fn(),
   } as unknown as UsersRepository;

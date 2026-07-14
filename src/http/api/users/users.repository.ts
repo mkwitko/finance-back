@@ -18,7 +18,6 @@ function toDomain(row: UserRow): User {
 export interface UsersRepository {
   /** Upsert by Google `sub` (first-access users are stamped by the SYSTEM actor). */
   upsertByGoogle(input: UpsertGoogleUserInput): Promise<User>;
-  findById(uuid: string): Promise<User | null>;
   findByUuid(uuid: string): Promise<User | null>;
   listUsers(args: { limit: number }): Promise<User[]>;
 }
@@ -46,11 +45,6 @@ export function createUsersRepository(db: Db): UsersRepository {
         },
       });
       return toDomain(row);
-    },
-
-    async findById(uuid) {
-      const row = await db.user.findUnique({ where: { uuid } });
-      return row ? toDomain(row) : null;
     },
 
     async findByUuid(uuid) {

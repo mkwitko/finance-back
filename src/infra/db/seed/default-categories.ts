@@ -1,8 +1,6 @@
-import { and, isNull } from "drizzle-orm";
 import type { CategoryKind } from "../../../domain/enums.js";
 import { SYSTEM_ACTOR_UUID } from "../../../shared/constants/system-actor.js";
 import type { Db } from "../client.js";
-import { category } from "../tables/categories/category.table.js";
 
 // System default categories (householdId = null, visible to everyone). Kept in pt-BR
 // for the launch market. The category NAMES are also the label set the Deepseek
@@ -34,25 +32,21 @@ export const DEFAULT_CATEGORIES: ReadonlyArray<{ name: string; kind: CategoryKin
 
 /** Idempotent: seeds the system categories only if none exist yet. */
 export async function seedDefaultCategories(db: Db): Promise<number> {
-  const existing = await db
-    .select({ id: category.id })
-    .from(category)
-    .where(and(isNull(category.householdId), isNull(category.deletedAt)))
-    .limit(1);
-  if (existing.length > 0) return 0;
+  const existing = await db.category.findFirst({
+    where: { householdId: null, deletedAt: null },
+    select: { uuid: true },
+  });
+  if (existing) return 0;
 
-  const now = new Date();
-  await db.insert(category).values(
-    DEFAULT_CATEGORIES.map((c) => ({
+  await db.category.createMany({
+    data: DEFAULT_CATEGORIES.map((c) => ({
       householdId: null,
       name: c.name,
       kind: c.kind,
       icon: c.icon,
       createdBy: SYSTEM_ACTOR_UUID,
       updatedBy: SYSTEM_ACTOR_UUID,
-      createdAt: now,
-      updatedAt: now,
     })),
-  );
+  });
   return DEFAULT_CATEGORIES.length;
 }

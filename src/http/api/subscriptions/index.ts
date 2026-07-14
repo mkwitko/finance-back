@@ -2,47 +2,45 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod/v4";
 import { db } from "../../../infra/db/client.js";
-import { entitlementsFor } from "../../../domain/entitlements.js";
-import type { SubscriptionPlan, SubscriptionStatus } from "../../../infra/db/tables/subscriptions/subscription.table.js";
-import { requireUser } from "../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../hooks/household/household.js";
-import { createSubscriptionsRepository } from "./subscriptions.repository.js";
-import { SubscriptionView } from "./subscriptions.schema.js";
+import { createSubscriptionsData } from "./subscriptions.data.js";
+import { createSubscriptionsService } from "./subscriptions.service.js";
+import { CheckoutBody, CheckoutSessionView, SubscriptionView } from "./subscriptions.schema.js";
 
 export const subscriptionsRoutes: FastifyPluginAsync = async (app) => {
-  const repo = createSubscriptionsRepository(db);
-  const present = (plan: SubscriptionPlan, status: SubscriptionStatus, periodEnd: string | null) => {
-    const effective: SubscriptionStatus = status === "active" && periodEnd && new Date(periodEnd) < new Date() ? "expired" : status;
-    return { plan, status: effective, currentPeriodEnd: periodEnd, entitlements: entitlementsFor(plan, effective) };
-  };
+  const data = createSubscriptionsData(db);
+  const svc = () => createSubscriptionsService({ stripe: app.gateways.stripe, data });
+  const params = z.object({ id: z.string() });
 
   app.withTypeProvider<ZodTypeProvider>().get("/households/:id/subscription", {
     preHandler: requireHouseholdRole("viewer"),
-    schema: { operationId: "getSubscription", tags: ["subscriptions"], summary: "Get subscription + entitlements", params: z.object({ id: z.string() }), response: { 200: SubscriptionView } },
+    schema: { operationId: "getSubscription", tags: ["subscriptions"], summary: "Get subscription + entitlements", params, response: { 200: SubscriptionView } },
   }, async (req, reply) => {
     const hh = requireHousehold(req);
-    const sub = await repo.getForHousehold(hh.id);
-    if (!sub) return reply.code(200).send(present("free", "active", null));
-    return reply.code(200).send(present(sub.plan, sub.status, sub.currentPeriodEnd));
+    return reply.code(200).send(await svc().get({ id: hh.id, uuid: hh.uuid }));
   });
 
-  app.withTypeProvider<ZodTypeProvider>().post("/households/:id/subscription/activate", {
+  app.withTypeProvider<ZodTypeProvider>().post("/households/:id/subscription/checkout", {
     preHandler: requireHouseholdRole("owner"),
-    schema: { operationId: "activateSubscription", tags: ["subscriptions"], summary: "Activate premium (stub)", params: z.object({ id: z.string() }), response: { 200: SubscriptionView } },
+    schema: { operationId: "checkoutSubscription", tags: ["subscriptions"], summary: "Start a subscription (PaymentSheet)", params, body: CheckoutBody, response: { 200: CheckoutSessionView } },
   }, async (req, reply) => {
     const hh = requireHousehold(req);
-    const periodEnd = new Date(Date.now() + 30 * 24 * 3600 * 1000);
-    const sub = await repo.upsertActive({ householdId: hh.id, plan: "premium", currentPeriodEnd: periodEnd, actorUuid: requireUser(req).sub });
-    return reply.code(200).send(present(sub.plan, sub.status, sub.currentPeriodEnd));
+    return reply.code(200).send(await svc().checkout({ id: hh.id, uuid: hh.uuid }, req.body.interval));
+  });
+
+  app.withTypeProvider<ZodTypeProvider>().post("/households/:id/subscription/switch", {
+    preHandler: requireHouseholdRole("owner"),
+    schema: { operationId: "switchSubscriptionInterval", tags: ["subscriptions"], summary: "Switch monthly/annual", params, body: CheckoutBody, response: { 200: SubscriptionView } },
+  }, async (req, reply) => {
+    const hh = requireHousehold(req);
+    return reply.code(200).send(await svc().switchInterval({ id: hh.id, uuid: hh.uuid }, req.body.interval));
   });
 
   app.withTypeProvider<ZodTypeProvider>().post("/households/:id/subscription/cancel", {
     preHandler: requireHouseholdRole("owner"),
-    schema: { operationId: "cancelSubscription", tags: ["subscriptions"], summary: "Cancel subscription", params: z.object({ id: z.string() }), response: { 200: SubscriptionView } },
+    schema: { operationId: "cancelSubscription", tags: ["subscriptions"], summary: "Cancel at period end", params, response: { 200: SubscriptionView } },
   }, async (req, reply) => {
     const hh = requireHousehold(req);
-    const sub = await repo.cancel({ householdId: hh.id, actorUuid: requireUser(req).sub });
-    if (!sub) return reply.code(200).send(present("free", "active", null));
-    return reply.code(200).send(present(sub.plan, sub.status, sub.currentPeriodEnd));
+    return reply.code(200).send(await svc().cancel({ id: hh.id, uuid: hh.uuid }));
   });
 };

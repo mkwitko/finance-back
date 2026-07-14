@@ -1,5 +1,19 @@
+import type { Prisma } from "@prisma/client";
 import type { MembershipRole } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
+import { ERRORS } from "../../../shared/errors/catalog.js";
+
+/**
+ * Race-safe last-owner guard. Takes a per-household advisory lock (same hashing scheme
+ * as insights.repository `replaceAll`) so concurrent leave/demote transactions on the
+ * same household serialize; then re-counts owners INSIDE the transaction. Throws
+ * LAST_OWNER (HH-T0005) when the pending mutation would leave the household with none.
+ */
+async function ensureNotLastOwner(tx: Prisma.TransactionClient, householdId: string): Promise<void> {
+  await tx.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${householdId}::text, 0))`;
+  const owners = await tx.membership.count({ where: { householdId, role: "owner", deletedAt: null } });
+  if (owners <= 1) throw ERRORS.HOUSEHOLD.LAST_OWNER();
+}
 
 export type Member = {
   userId: string; // public uuid
@@ -20,8 +34,16 @@ export interface MembersRepository {
     userId: string;
     role: MembershipRole;
     actorUuid: string;
+    /** When true, enforce the last-owner guard atomically before the mutation. */
+    guardLastOwner?: boolean;
   }): Promise<void>;
-  removeMember(args: { householdId: string; userId: string; actorUuid: string }): Promise<void>;
+  removeMember(args: {
+    householdId: string;
+    userId: string;
+    actorUuid: string;
+    /** When true, enforce the last-owner guard atomically before the mutation. */
+    guardLastOwner?: boolean;
+  }): Promise<void>;
 }
 
 export function createMembersRepository(db: Db): MembersRepository {
@@ -52,17 +74,23 @@ export function createMembersRepository(db: Db): MembersRepository {
       return { membershipUuid: row.uuid, userId: row.userId, role: row.role };
     },
 
-    async updateRole({ householdId, userId, role, actorUuid }) {
-      await db.membership.update({
-        where: { userId_householdId: { userId, householdId } },
-        data: { role, updatedBy: actorUuid, updatedAt: new Date() },
+    async updateRole({ householdId, userId, role, actorUuid, guardLastOwner = false }) {
+      await db.$transaction(async (tx) => {
+        if (guardLastOwner) await ensureNotLastOwner(tx, householdId);
+        await tx.membership.update({
+          where: { userId_householdId: { userId, householdId } },
+          data: { role, updatedBy: actorUuid, updatedAt: new Date() },
+        });
       });
     },
 
-    async removeMember({ householdId, userId, actorUuid }) {
-      await db.membership.update({
-        where: { userId_householdId: { userId, householdId } },
-        data: { deletedAt: new Date(), updatedBy: actorUuid, updatedAt: new Date() },
+    async removeMember({ householdId, userId, actorUuid, guardLastOwner = false }) {
+      await db.$transaction(async (tx) => {
+        if (guardLastOwner) await ensureNotLastOwner(tx, householdId);
+        await tx.membership.update({
+          where: { userId_householdId: { userId, householdId } },
+          data: { deletedAt: new Date(), updatedBy: actorUuid, updatedAt: new Date() },
+        });
       });
     },
   };

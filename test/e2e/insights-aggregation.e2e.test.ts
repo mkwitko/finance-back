@@ -1,21 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import * as schema from "../../src/infra/db/schema.js";
+import type { Db } from "../../src/infra/db/client.js";
 import { createInsightsRepository } from "../../src/http/api/insights/insights.repository.js";
 import { buildTestApp, type TestApp } from "./helpers/app.js";
 
 // Exercises the real SQL in insights.repository against a live Postgres (Testcontainers),
-// seeding directly via drizzle so we control internal numeric ids and category identity
-// precisely — this is what proves categorySums keeps distinct categories with the same
-// name+kind separate (FIX 3) and that the bigint sum casts don't blow up (FIX 2).
+// seeding directly via Prisma so we control category identity precisely — this is what
+// proves categorySums keeps distinct categories with the same name+kind separate (FIX 3)
+// and that the bigint sum casts don't blow up (FIX 2).
 describe("insights repository aggregation (db)", () => {
   let h: TestApp;
-  let db: ReturnType<typeof drizzle<typeof schema>>;
+  let db: Db;
 
   beforeAll(async () => {
     h = await buildTestApp();
-    db = drizzle(h.pool, { schema });
+    // Dynamic import: must resolve after buildTestApp() has pointed DATABASE_URL at the
+    // Testcontainer, since the Prisma client singleton binds its connection at first import.
+    ({ db } = await import("../../src/infra/db/client.js"));
   }, 120_000);
 
   afterAll(async () => {
@@ -25,93 +26,91 @@ describe("insights repository aggregation (db)", () => {
   it("sums categories by category id (not just name+kind), computes net all-time, and returns goals", async () => {
     const actor = randomUUID();
 
-    const [household] = await db
-      .insert(schema.household)
-      .values({ name: "Casa Aggregation", type: "individual", createdBy: actor, updatedBy: actor })
-      .returning();
-    if (!household) throw new Error("household insert failed");
-    const householdId = household.id;
+    const household = await db.household.create({
+      data: { name: "Casa Aggregation", type: "individual", createdBy: actor, updatedBy: actor },
+    });
+    const householdId = household.uuid;
 
-    const [account] = await db
-      .insert(schema.account)
-      .values({ householdId, name: "Conta", kind: "checking", createdBy: actor, updatedBy: actor })
-      .returning();
-    if (!account) throw new Error("account insert failed");
-    const accountId = account.id;
+    const account = await db.account.create({
+      data: { householdId, name: "Conta", kind: "checking", createdBy: actor, updatedBy: actor },
+    });
+    const accountId = account.uuid;
 
     // Two DISTINCT categories that share the same name+kind — must NOT be merged.
-    const [catA, catB] = await db
-      .insert(schema.category)
-      .values([
-        { householdId, name: "Mercado", kind: "expense", createdBy: actor, updatedBy: actor },
-        { householdId, name: "Mercado", kind: "expense", createdBy: actor, updatedBy: actor },
-      ])
-      .returning();
-    if (!catA || !catB) throw new Error("category insert failed");
-    expect(catA.id).not.toBe(catB.id);
+    const catA = await db.category.create({
+      data: { householdId, name: "Mercado", kind: "expense", createdBy: actor, updatedBy: actor },
+    });
+    const catB = await db.category.create({
+      data: { householdId, name: "Mercado", kind: "expense", createdBy: actor, updatedBy: actor },
+    });
+    expect(catA.uuid).not.toBe(catB.uuid);
 
     const windowStart = new Date("2030-01-01T00:00:00.000Z");
     const windowEnd = new Date("2030-02-01T00:00:00.000Z");
     const inWindow = new Date("2030-01-15T00:00:00.000Z");
     const outOfWindow = new Date("2029-12-01T00:00:00.000Z"); // excluded from categorySums, included in netAllTime
 
-    await db.insert(schema.transaction).values([
-      {
-        accountId,
-        categoryId: catA.id,
-        amountCents: 12345,
-        direction: "out",
-        occurredAt: inWindow,
-        description: "Compra A",
-        source: "manual",
-        createdBy: actor,
-        updatedBy: actor,
-      },
-      {
-        accountId,
-        categoryId: catB.id,
-        amountCents: 6789,
-        direction: "out",
-        occurredAt: inWindow,
-        description: "Compra B",
-        source: "manual",
-        createdBy: actor,
-        updatedBy: actor,
-      },
-      {
-        // No category → collapses into "Sem categoria", kind derived from direction.
-        accountId,
-        categoryId: null,
-        amountCents: 100000,
-        direction: "in",
-        occurredAt: inWindow,
-        description: "Salário",
-        source: "manual",
-        createdBy: actor,
-        updatedBy: actor,
-      },
-      {
-        // Outside the categorySums window, but still counted by netAllTime (no date filter).
-        accountId,
-        categoryId: catA.id,
-        amountCents: 5000,
-        direction: "out",
-        occurredAt: outOfWindow,
-        description: "Compra antiga",
-        source: "manual",
-        createdBy: actor,
-        updatedBy: actor,
-      },
-    ]);
+    await db.transaction.createMany({
+      data: [
+        {
+          accountId,
+          categoryId: catA.uuid,
+          amountCents: 12345,
+          direction: "out",
+          occurredAt: inWindow,
+          description: "Compra A",
+          source: "manual",
+          createdBy: actor,
+          updatedBy: actor,
+        },
+        {
+          accountId,
+          categoryId: catB.uuid,
+          amountCents: 6789,
+          direction: "out",
+          occurredAt: inWindow,
+          description: "Compra B",
+          source: "manual",
+          createdBy: actor,
+          updatedBy: actor,
+        },
+        {
+          // No category → collapses into "Sem categoria", kind derived from direction.
+          accountId,
+          categoryId: null,
+          amountCents: 100000,
+          direction: "in",
+          occurredAt: inWindow,
+          description: "Salário",
+          source: "manual",
+          createdBy: actor,
+          updatedBy: actor,
+        },
+        {
+          // Outside the categorySums window, but still counted by netAllTime (no date filter).
+          accountId,
+          categoryId: catA.uuid,
+          amountCents: 5000,
+          direction: "out",
+          occurredAt: outOfWindow,
+          description: "Compra antiga",
+          source: "manual",
+          createdBy: actor,
+          updatedBy: actor,
+        },
+      ],
+    });
 
-    await db.insert(schema.goal).values({
-      householdId,
-      type: "emergency",
-      name: "Reserva",
-      targetAmountCents: 500000,
-      currentAmountCents: 150000,
-      createdBy: actor,
-      updatedBy: actor,
+    await db.goal.create({
+      data: {
+        householdId,
+        type: "emergency",
+        name: "Reserva",
+        targetAmountCents: 500000,
+        currentAmountCents: 150000,
+        createdBy: actor,
+        updatedBy: actor,
+      },
     });
 
     const repo = createInsightsRepository(db);

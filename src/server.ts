@@ -1,6 +1,6 @@
 import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
-import { closeDb, getPool } from "./infra/db/client.js";
+import { closeDb, db } from "./infra/db/client.js";
 import { logger } from "./infra/observability/logger.js";
 
 const SHUTDOWN_TIMEOUT = 30_000;
@@ -9,7 +9,7 @@ async function main(): Promise<void> {
   const app = await buildApp();
 
   // Fail fast if the database is unreachable.
-  await getPool().query("select 1");
+  await db.$queryRaw`select 1`;
 
   await app.listen({ port: env.PORT, host: "0.0.0.0" });
   logger.info({ port: env.PORT, env: env.NODE_ENV }, "server.ready");

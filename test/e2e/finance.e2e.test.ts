@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import * as schema from "../../src/infra/db/schema.js";
+import type { Db } from "../../src/infra/db/client.js";
 import { seedDefaultCategories } from "../../src/infra/db/seed/default-categories.js";
 import { buildTestApp, type TestApp } from "./helpers/app.js";
 
@@ -13,7 +11,7 @@ const OFX = `<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>
 // End-to-end: import → AI-categorize (fake deepseek) → list, plus household RBAC.
 describe("finance import + rbac e2e (db)", () => {
   let h: TestApp;
-  let db: ReturnType<typeof drizzle<typeof schema>>;
+  let db: Db;
 
   async function login(idToken: string): Promise<string> {
     const res = await h.app.inject({ method: "POST", url: "/auth/google", payload: { idToken } });
@@ -23,7 +21,9 @@ describe("finance import + rbac e2e (db)", () => {
 
   beforeAll(async () => {
     h = await buildTestApp();
-    db = drizzle(h.pool, { schema });
+    // Dynamic import: must resolve after buildTestApp() has pointed DATABASE_URL at the
+    // Testcontainer, since the Prisma client singleton binds its connection at first import.
+    ({ db } = await import("../../src/infra/db/client.js"));
     await seedDefaultCategories(db);
   }, 120_000);
 
@@ -119,19 +119,17 @@ describe("finance import + rbac e2e (db)", () => {
 
     // Bob joins as a viewer (inserted directly), then is blocked from writing.
     const bobToken = await login("bob");
-    const bob = (
-      await db.select().from(schema.user).where(eq(schema.user.email, "bob@example.com"))
-    ).at(0);
-    const hhRow = (
-      await db.select().from(schema.household).where(eq(schema.household.uuid, householdUuid))
-    ).at(0);
-    if (!bob || !hhRow) throw new Error("test fixture not found");
-    await db.insert(schema.membership).values({
-      userId: bob.id,
-      householdId: hhRow.id,
-      role: "viewer",
-      createdBy: bob.uuid,
-      updatedBy: bob.uuid,
+    const bob = await db.user.findFirst({ where: { email: "bob@example.com" } });
+    if (!bob) throw new Error("test fixture not found");
+    // Identity is uuid-only now, so householdId is just the household uuid we already have.
+    await db.membership.create({
+      data: {
+        userId: bob.uuid,
+        householdId: householdUuid,
+        role: "viewer",
+        createdBy: bob.uuid,
+        updatedBy: bob.uuid,
+      },
     });
 
     const bobHh = { authorization: `Bearer ${bobToken}`, "x-household-id": householdUuid };

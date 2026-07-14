@@ -1,8 +1,5 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
 import type { MembershipRole } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import { membership } from "../../../infra/db/tables/households/membership.table.js";
-import { user } from "../../../infra/db/tables/users/user.table.js";
 
 export type Member = {
   userId: string; // public uuid
@@ -12,84 +9,61 @@ export type Member = {
 };
 
 export interface MembersRepository {
-  listMembers(householdId: number): Promise<Member[]>;
-  countOwners(householdId: number): Promise<number>;
+  listMembers(householdId: string): Promise<Member[]>;
+  countOwners(householdId: string): Promise<number>;
   findMember(
-    householdId: number,
+    householdId: string,
     userUuid: string,
-  ): Promise<{ membershipId: number; userId: number; role: MembershipRole } | null>;
+  ): Promise<{ membershipUuid: string; userId: string; role: MembershipRole } | null>;
   updateRole(args: {
-    householdId: number;
-    userId: number;
+    householdId: string;
+    userId: string;
     role: MembershipRole;
     actorUuid: string;
   }): Promise<void>;
-  removeMember(args: { householdId: number; userId: number; actorUuid: string }): Promise<void>;
+  removeMember(args: { householdId: string; userId: string; actorUuid: string }): Promise<void>;
 }
 
 export function createMembersRepository(db: Db): MembersRepository {
   return {
     async listMembers(householdId) {
-      const rows = await db
-        .select({
-          userId: user.uuid,
-          name: user.name,
-          role: membership.role,
-          joinedAt: membership.createdAt,
-        })
-        .from(membership)
-        .innerJoin(user, eq(user.id, membership.userId))
-        .where(and(eq(membership.householdId, householdId), isNull(membership.deletedAt)));
+      const rows = await db.membership.findMany({
+        where: { householdId, deletedAt: null },
+        select: { role: true, createdAt: true, user: { select: { uuid: true, name: true } } },
+      });
       return rows.map((r) => ({
-        userId: r.userId,
-        name: r.name,
+        userId: r.user.uuid,
+        name: r.user.name,
         role: r.role,
-        joinedAt: r.joinedAt.toISOString(),
+        joinedAt: r.createdAt.toISOString(),
       }));
     },
 
     async countOwners(householdId) {
-      const rows = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(membership)
-        .where(
-          and(
-            eq(membership.householdId, householdId),
-            eq(membership.role, "owner"),
-            isNull(membership.deletedAt),
-          ),
-        );
-      return rows[0]?.n ?? 0;
+      return db.membership.count({ where: { householdId, role: "owner", deletedAt: null } });
     },
 
     async findMember(householdId, userUuid) {
-      const rows = await db
-        .select({ membershipId: membership.id, userId: membership.userId, role: membership.role })
-        .from(membership)
-        .innerJoin(user, eq(user.id, membership.userId))
-        .where(
-          and(
-            eq(membership.householdId, householdId),
-            eq(user.uuid, userUuid),
-            isNull(membership.deletedAt),
-          ),
-        )
-        .limit(1);
-      return rows[0] ?? null;
+      const row = await db.membership.findFirst({
+        where: { householdId, userId: userUuid, deletedAt: null },
+        select: { uuid: true, userId: true, role: true },
+      });
+      if (!row) return null;
+      return { membershipUuid: row.uuid, userId: row.userId, role: row.role };
     },
 
     async updateRole({ householdId, userId, role, actorUuid }) {
-      await db
-        .update(membership)
-        .set({ role, updatedBy: actorUuid, updatedAt: new Date() })
-        .where(and(eq(membership.householdId, householdId), eq(membership.userId, userId)));
+      await db.membership.update({
+        where: { userId_householdId: { userId, householdId } },
+        data: { role, updatedBy: actorUuid, updatedAt: new Date() },
+      });
     },
 
     async removeMember({ householdId, userId, actorUuid }) {
-      await db
-        .update(membership)
-        .set({ deletedAt: new Date(), updatedBy: actorUuid, updatedAt: new Date() })
-        .where(and(eq(membership.householdId, householdId), eq(membership.userId, userId)));
+      await db.membership.update({
+        where: { userId_householdId: { userId, householdId } },
+        data: { deletedAt: new Date(), updatedBy: actorUuid, updatedAt: new Date() },
+      });
     },
   };
 }

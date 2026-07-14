@@ -25,7 +25,7 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const list = await members.listMembers(hh.id);
+      const list = await members.listMembers(hh.uuid);
       return reply.code(200).send({ members: list });
     },
   );
@@ -46,20 +46,20 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const hh = requireHousehold(req);
       const targetUuid = (req.params as { userId: string }).userId;
-      const target = await members.findMember(hh.id, targetUuid);
+      const target = await members.findMember(hh.uuid, targetUuid);
       if (!target) throw ERRORS.HOUSEHOLD.NOT_A_MEMBER();
       // Last-owner guard: demoting the only owner is forbidden.
       if (target.role === "owner" && req.body.role !== "owner") {
-        const owners = await members.countOwners(hh.id);
+        const owners = await members.countOwners(hh.uuid);
         if (owners <= 1) throw ERRORS.HOUSEHOLD.LAST_OWNER();
       }
       await members.updateRole({
-        householdId: hh.id,
+        householdId: hh.uuid,
         userId: target.userId,
         role: req.body.role,
         actorUuid: requireUser(req).sub,
       });
-      const refreshed = await members.listMembers(hh.id);
+      const refreshed = await members.listMembers(hh.uuid);
       const view = refreshed.find((m) => m.userId === targetUuid);
       if (!view) throw ERRORS.HOUSEHOLD.NOT_A_MEMBER();
       return reply.code(200).send(view);
@@ -85,15 +85,15 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
       const targetUuid = (req.params as { userId: string }).userId;
       const isSelf = targetUuid === auth.sub;
       if (!isSelf && hh.role !== "owner") throw ERRORS.HOUSEHOLD.INSUFFICIENT_ROLE();
-      const target = await members.findMember(hh.id, targetUuid);
+      const target = await members.findMember(hh.uuid, targetUuid);
       if (!target) throw ERRORS.HOUSEHOLD.NOT_A_MEMBER();
       // Last-owner guard: the only owner cannot be removed / leave.
       if (target.role === "owner") {
-        const owners = await members.countOwners(hh.id);
+        const owners = await members.countOwners(hh.uuid);
         if (owners <= 1) throw ERRORS.HOUSEHOLD.LAST_OWNER();
       }
-      await members.removeMember({ householdId: hh.id, userId: target.userId, actorUuid: auth.sub });
-      await syncSeatsSafe(app, { id: hh.id, uuid: hh.uuid });
+      await members.removeMember({ householdId: hh.uuid, userId: target.userId, actorUuid: auth.sub });
+      await syncSeatsSafe(app, { uuid: hh.uuid });
       return reply.code(204).send(null);
     },
   );

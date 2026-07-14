@@ -40,7 +40,7 @@ export const importsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const account = await accountsRepo.findByUuid(hh.id, req.body.accountId);
+      const account = await accountsRepo.findByUuid(hh.uuid, req.body.accountId);
       if (!account) throw ERRORS.RESOURCE.NOT_FOUND();
 
       const service = createImportService({
@@ -50,8 +50,8 @@ export const importsRoutes: FastifyPluginAsync = async (app) => {
         importsRepo,
       });
       const result = await service({
-        householdId: hh.id,
-        accountId: account.id,
+        householdId: hh.uuid,
+        accountId: account.uuid,
         source: req.body.source,
         content: req.body.content,
         actorUuid: requireUser(req).sub,
@@ -74,7 +74,7 @@ export const importsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const account = await accountsRepo.findByUuid(hh.id, req.body.accountId);
+      const account = await accountsRepo.findByUuid(hh.uuid, req.body.accountId);
       if (!account) throw ERRORS.RESOURCE.NOT_FOUND();
       const preview = createPreviewService({
         deepseek: req.server.gateways.deepseek,
@@ -83,8 +83,8 @@ export const importsRoutes: FastifyPluginAsync = async (app) => {
         importsRepo,
       });
       const rows = await preview({
-        householdId: hh.id,
-        accountId: account.id,
+        householdId: hh.uuid,
+        accountId: account.uuid,
         source: req.body.source,
         content: req.body.content,
       });
@@ -106,7 +106,7 @@ export const importsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const account = await accountsRepo.findByUuid(hh.id, req.body.accountId);
+      const account = await accountsRepo.findByUuid(hh.uuid, req.body.accountId);
       if (!account) throw ERRORS.RESOURCE.NOT_FOUND();
       const commit = createCommitService({
         deepseek: req.server.gateways.deepseek,
@@ -115,8 +115,8 @@ export const importsRoutes: FastifyPluginAsync = async (app) => {
         importsRepo,
       });
       const result = await commit({
-        householdId: hh.id,
-        accountId: account.id,
+        householdId: hh.uuid,
+        accountId: account.uuid,
         source: req.body.source,
         rows: req.body.rows,
         actorUuid: requireUser(req).sub,

@@ -16,7 +16,7 @@ function deps(overrides: Partial<Record<string, unknown>> = {}) {
     categoriesRepo: { listVisible: vi.fn(async () => []) },
     transactionsRepo: { create: vi.fn(), createMany: vi.fn(async () => 0) },
     importsRepo: {
-      createBatch: vi.fn(async () => ({ id: 1, uuid: "batch-uuid" })),
+      createBatch: vi.fn(async () => ({ uuid: "22222222-2222-2222-2222-222222222222" })),
       markCompleted: vi.fn(),
       markFailed: vi.fn(),
       existingRawRefs: vi.fn(async () => new Set(["TX1"])), // TX1 already imported
@@ -25,11 +25,14 @@ function deps(overrides: Partial<Record<string, unknown>> = {}) {
   } as never;
 }
 
+const HOUSEHOLD_ID = "11111111-1111-1111-1111-111111111111";
+const ACCOUNT_ID = "99999999-9999-9999-9999-999999999999";
+
 describe("previewImport", () => {
   it("parses + flags duplicates and persists NOTHING", async () => {
     const d = deps();
     const preview = createPreviewService(d);
-    const rows = await preview({ householdId: 1, accountId: 9, source: "ofx", content: OFX });
+    const rows = await preview({ householdId: HOUSEHOLD_ID, accountId: ACCOUNT_ID, source: "ofx", content: OFX });
     expect(rows).toHaveLength(2);
     expect(rows.find((r) => r.rawRef === "TX1")?.duplicate).toBe(true);
     expect(rows.find((r) => r.rawRef === "TX2")?.duplicate).toBe(false);
@@ -44,8 +47,8 @@ describe("commitImport", () => {
     const d = deps();
     const commit = createCommitService(d);
     const res = await commit({
-      householdId: 1,
-      accountId: 9,
+      householdId: HOUSEHOLD_ID,
+      accountId: ACCOUNT_ID,
       source: "ofx",
       actorUuid: "actor",
       rows: [

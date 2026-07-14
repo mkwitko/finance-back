@@ -10,7 +10,7 @@ import { type NormalizedRow, parseCsv, parseOfx } from "./parsers.js";
 
 export type ImportInput = {
   householdId: string;
-  accountId: number;
+  accountId: string;
   source: ImportSource;
   content: string;
   actorUuid: string;
@@ -89,7 +89,7 @@ async function categorizeRows(
 export function createPreviewService(deps: ImportServiceDeps) {
   return async (input: {
     householdId: string;
-    accountId: number;
+    accountId: string;
     source: ImportSource;
     content: string;
   }): Promise<PreviewRow[]> => {
@@ -116,7 +116,7 @@ export function createPreviewService(deps: ImportServiceDeps) {
 export function createCommitService(deps: ImportServiceDeps) {
   return async (input: {
     householdId: string;
-    accountId: number;
+    accountId: string;
     source: ImportSource;
     rows: CommitRow[];
     actorUuid: string;
@@ -142,7 +142,7 @@ export function createCommitService(deps: ImportServiceDeps) {
       const toInsert: CreateTransactionInput[] = fresh.map((r) => ({
         accountId: input.accountId,
         categoryId: r.categoryName ? (byName.get(r.categoryName)?.uuid ?? null) : null,
-        importBatchId: batch.id,
+        importBatchId: batch.uuid,
         amountCents: r.amountCents,
         direction: r.direction,
         occurredAt: new Date(r.occurredAt),
@@ -154,10 +154,10 @@ export function createCommitService(deps: ImportServiceDeps) {
         actorUuid: input.actorUuid,
       }));
       const imported = await deps.transactionsRepo.createMany(toInsert);
-      await deps.importsRepo.markCompleted(batch.id, imported);
+      await deps.importsRepo.markCompleted(batch.uuid, imported);
       return { importId: batch.uuid, imported, skipped: input.rows.length - fresh.length };
     } catch (err) {
-      await deps.importsRepo.markFailed(batch.id, err instanceof Error ? err.message : "unknown");
+      await deps.importsRepo.markFailed(batch.uuid, err instanceof Error ? err.message : "unknown");
       throw err;
     }
   };
@@ -191,7 +191,7 @@ export function createImportService(deps: ImportServiceDeps) {
         return {
           accountId: input.accountId,
           categoryId: matched?.uuid ?? null,
-          importBatchId: batch.id,
+          importBatchId: batch.uuid,
           amountCents: r.amountCents,
           direction: r.direction,
           occurredAt: r.occurredAt,
@@ -205,7 +205,7 @@ export function createImportService(deps: ImportServiceDeps) {
       });
       const count = await deps.transactionsRepo.createMany(toInsert);
 
-      await deps.importsRepo.markCompleted(batch.id, count);
+      await deps.importsRepo.markCompleted(batch.uuid, count);
       return {
         importId: batch.uuid,
         source: input.source,
@@ -213,7 +213,7 @@ export function createImportService(deps: ImportServiceDeps) {
         transactionCount: count,
       };
     } catch (err) {
-      await deps.importsRepo.markFailed(batch.id, err instanceof Error ? err.message : "unknown");
+      await deps.importsRepo.markFailed(batch.uuid, err instanceof Error ? err.message : "unknown");
       throw err;
     }
   };

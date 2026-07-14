@@ -53,13 +53,13 @@ export const transactionsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const filters: { accountId?: number; limit: number } = { limit: req.query.limit };
+      const filters: { accountId?: string; limit: number } = { limit: req.query.limit };
       if (req.query.accountId) {
-        const acc = await accountsRepo.findByUuid(hh.id, req.query.accountId);
+        const acc = await accountsRepo.findByUuid(hh.uuid, req.query.accountId);
         if (!acc) throw ERRORS.RESOURCE.NOT_FOUND();
-        filters.accountId = acc.id;
+        filters.accountId = acc.uuid;
       }
-      const transactions = await repo.listByHousehold(hh.id, filters);
+      const transactions = await repo.listByHousehold(hh.uuid, filters);
       return reply.code(200).send({ transactions: transactions.map(present) });
     },
   );
@@ -79,18 +79,18 @@ export const transactionsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const acc = await accountsRepo.findByUuid(hh.id, req.body.accountId);
+      const acc = await accountsRepo.findByUuid(hh.uuid, req.body.accountId);
       if (!acc) throw ERRORS.RESOURCE.NOT_FOUND();
 
-      let categoryId: number | null = null;
+      let categoryId: string | null = null;
       if (req.body.categoryId) {
-        const cat = await categoriesRepo.findVisibleByUuid(hh.id, req.body.categoryId);
+        const cat = await categoriesRepo.findVisibleByUuid(hh.uuid, req.body.categoryId);
         if (!cat) throw ERRORS.RESOURCE.NOT_FOUND();
-        categoryId = cat.id;
+        categoryId = cat.uuid;
       }
 
       const created = await repo.create({
-        accountId: acc.id,
+        accountId: acc.uuid,
         categoryId,
         importBatchId: null,
         amountCents: req.body.amountCents,

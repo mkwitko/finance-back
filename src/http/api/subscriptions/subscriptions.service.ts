@@ -90,20 +90,18 @@ export function createSubscriptionsService(deps: {
       const existing = await stripe.getHouseholdSubscription(customerId, ctx.uuid);
       if (existing) {
         // `existing.status` is the RAW Stripe status (not the normalized
-        // SubscriptionStatus from statusFromStripe): active/trialing/past_due are
-        // genuinely live paid subs, so re-checkout is rejected. `incomplete` means
-        // payment was never confirmed (PaymentSheet abandoned/failed) — that sub
-        // hasn't billed anything yet, so we reuse it instead of orphaning a second
-        // incomplete subscription and instead of 409-locking the user out for ~23h
-        // until Stripe auto-expires it.
-        if (["active", "trialing", "past_due"].includes(existing.status)) {
-          throw ERRORS.SUB.ALREADY_SUBSCRIBED();
-        }
+        // SubscriptionStatus from statusFromStripe): `incomplete` means payment was
+        // never confirmed (PaymentSheet abandoned/failed) — that sub hasn't billed
+        // anything yet, so we reuse it instead of orphaning a second incomplete
+        // subscription and instead of 409-locking the user out for ~23h until Stripe
+        // auto-expires it. Any other status (active/trialing/past_due/unpaid/paused/etc)
+        // represents a live subscription — reject re-checkout to avoid double-billing.
         if (existing.status === "incomplete") {
           const ephemeralKeySecret = await stripe.createEphemeralKey(customerId);
           const paymentIntentClientSecret = await stripe.getSubscriptionClientSecret(existing.id);
           return { paymentIntentClientSecret, ephemeralKeySecret, customerId, publishableKey: stripe.publishableKey };
         }
+        throw ERRORS.SUB.ALREADY_SUBSCRIBED();
       }
       const quantity = await data.countActiveMembers(ctx.id);
       const priceId = priceIdForInterval(interval);

@@ -12,6 +12,7 @@
   "HH-T0003": "Your role does not allow this action.",
   "HH-T0004": "Household not found.",
   "HH-T0005": "A context must keep at least one owner.",
+  "HH-T0006": "The new owner must be an active adult member of this context.",
   "INV-T0001": "Invalid invitation.",
   "INV-T0002": "This invitation has expired or was revoked.",
   "INV-T0003": "You are already a member of this context.",

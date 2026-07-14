@@ -44,6 +44,19 @@ export interface MembersRepository {
     /** When true, enforce the last-owner guard atomically before the mutation. */
     guardLastOwner?: boolean;
   }): Promise<void>;
+  /**
+   * Atomic ownership handover: promote an active `adult` member to `owner` and
+   * soft-delete the caller's own membership, in a single transaction under the
+   * per-household advisory lock. Re-verifies the target is still an active adult
+   * inside the lock (throws TRANSFER_TARGET_INELIGIBLE otherwise). No last-owner
+   * guard: a new owner is created in the same transaction.
+   */
+  transferOwnership(args: {
+    householdId: string;
+    newOwnerUserId: string;
+    callerUserId: string;
+    actorUuid: string;
+  }): Promise<void>;
 }
 
 export function createMembersRepository(db: Db): MembersRepository {
@@ -90,6 +103,29 @@ export function createMembersRepository(db: Db): MembersRepository {
         await tx.membership.update({
           where: { userId_householdId: { userId, householdId } },
           data: { deletedAt: new Date(), updatedBy: actorUuid, updatedAt: new Date() },
+        });
+      });
+    },
+
+    async transferOwnership({ householdId, newOwnerUserId, callerUserId, actorUuid }) {
+      await db.$transaction(async (tx) => {
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${householdId}::text, 0))`;
+        // Re-verify the target inside the lock: a concurrent role/membership change
+        // could have made it stale between route validation and here.
+        const target = await tx.membership.findFirst({
+          where: { householdId, userId: newOwnerUserId, role: "adult", deletedAt: null },
+          select: { userId: true },
+        });
+        if (!target) throw ERRORS.HOUSEHOLD.TRANSFER_TARGET_INELIGIBLE();
+        const now = new Date();
+        await tx.membership.update({
+          where: { userId_householdId: { userId: newOwnerUserId, householdId } },
+          data: { role: "owner", updatedBy: actorUuid, updatedAt: now },
+        });
+        // Old owner leaves: no last-owner guard needed, a new owner exists in this tx.
+        await tx.membership.update({
+          where: { userId_householdId: { userId: callerUserId, householdId } },
+          data: { deletedAt: now, updatedBy: actorUuid, updatedAt: now },
         });
       });
     },

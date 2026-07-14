@@ -6,6 +6,7 @@ import type { SubscriptionsData } from "./subscriptions.data.js";
 function fakeData(overrides: Partial<SubscriptionsData> = {}): SubscriptionsData {
   return {
     async ownerEmail() { return "owner@example.com"; },
+    async memberEmail() { return "member@example.com"; },
     async countActiveMembers() { return 3; },
     ...overrides,
   };

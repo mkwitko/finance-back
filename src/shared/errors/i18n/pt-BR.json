@@ -12,6 +12,7 @@
   "HH-T0003": "Seu papel não permite esta ação.",
   "HH-T0004": "Núcleo financeiro não encontrado.",
   "HH-T0005": "O contexto precisa de pelo menos um dono.",
+  "HH-T0006": "O novo dono precisa ser um membro adulto ativo deste contexto.",
   "INV-T0001": "Convite inválido.",
   "INV-T0002": "Este convite expirou ou foi revogado.",
   "INV-T0003": "Você já faz parte deste contexto.",

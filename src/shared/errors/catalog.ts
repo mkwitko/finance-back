@@ -27,6 +27,7 @@ export const ERRORS = {
     INSUFFICIENT_ROLE: make("HH-T0003", 403, "household_insufficient_role"),
     NOT_FOUND: make("HH-T0004", 404, "household_not_found"),
     LAST_OWNER: make("HH-T0005", 409, "household_last_owner"),
+    TRANSFER_TARGET_INELIGIBLE: make("HH-T0006", 409, "household_transfer_target_ineligible"),
   },
   INVITATION: {
     NOT_FOUND: make("INV-T0001", 404, "invitation_not_found"),

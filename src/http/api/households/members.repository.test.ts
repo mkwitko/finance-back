@@ -9,5 +9,6 @@ describe("createMembersRepository", () => {
     expect(typeof repo.findMember).toBe("function");
     expect(typeof repo.updateRole).toBe("function");
     expect(typeof repo.removeMember).toBe("function");
+    expect(typeof repo.transferOwnership).toBe("function");
   });
 });

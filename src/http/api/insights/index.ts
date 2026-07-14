@@ -26,7 +26,7 @@ export const insightsRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const hh = requireHousehold(req);
       const service = createInsightsService({ repo, gateway: req.server.gateways.deepseek });
-      const insights = await service.getOrGenerate({ householdId: hh.id, actorUuid: requireUser(req).sub, now: new Date() });
+      const insights = await service.getOrGenerate({ householdId: hh.uuid, actorUuid: requireUser(req).sub, now: new Date() });
       return reply.code(200).send({ insights });
     },
   );
@@ -46,7 +46,7 @@ export const insightsRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const hh = requireHousehold(req);
       const service = createInsightsService({ repo, gateway: req.server.gateways.deepseek });
-      const insights = await service.regenerate({ householdId: hh.id, actorUuid: requireUser(req).sub, now: new Date() });
+      const insights = await service.regenerate({ householdId: hh.uuid, actorUuid: requireUser(req).sub, now: new Date() });
       return reply.code(200).send({ insights });
     },
   );

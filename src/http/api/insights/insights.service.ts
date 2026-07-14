@@ -14,7 +14,7 @@ function monthWindows(now: Date) {
 export function createInsightsService(deps: { repo: InsightsRepository; gateway: DeepseekGateway }) {
   const { repo, gateway } = deps;
 
-  async function generate(householdId: number, actorUuid: string, now: Date): Promise<Insight[]> {
+  async function generate(householdId: string, actorUuid: string, now: Date): Promise<Insight[]> {
     const { prevStart, curStart, nextStart } = monthWindows(now);
     const [current, previous, netAllTimeCents, goals] = await Promise.all([
       repo.categorySums(householdId, curStart.toISOString(), nextStart.toISOString()),
@@ -35,12 +35,12 @@ export function createInsightsService(deps: { repo: InsightsRepository; gateway:
   }
 
   return {
-    async getOrGenerate({ householdId, actorUuid, now }: { householdId: number; actorUuid: string; now: Date }) {
+    async getOrGenerate({ householdId, actorUuid, now }: { householdId: string; actorUuid: string; now: Date }) {
       const latest = await repo.latestGeneratedAt(householdId);
       if (latest && now.getTime() - latest.getTime() < STALE_MS) return repo.listActive(householdId);
       return generate(householdId, actorUuid, now);
     },
-    regenerate({ householdId, actorUuid, now }: { householdId: number; actorUuid: string; now: Date }) {
+    regenerate({ householdId, actorUuid, now }: { householdId: string; actorUuid: string; now: Date }) {
       return generate(householdId, actorUuid, now);
     },
   };

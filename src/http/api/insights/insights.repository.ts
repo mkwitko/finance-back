@@ -1,10 +1,5 @@
-import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import type { Insight as InsightRow } from "@prisma/client";
 import type { Db } from "../../../infra/db/client.js";
-import { account } from "../../../infra/db/tables/accounts/account.table.js";
-import { category } from "../../../infra/db/tables/categories/category.table.js";
-import { goal } from "../../../infra/db/tables/goals/goal.table.js";
-import { type InsightRow, insight } from "../../../infra/db/tables/insights/insight.table.js";
-import { transaction } from "../../../infra/db/tables/transactions/transaction.table.js";
 import type { GeneratedInsight } from "../../../gateways/deepseek/deepseek.gateway.js";
 import type { CategorySum, GoalInput } from "./insights.aggregate.js";
 
@@ -35,13 +30,13 @@ function toDomain(r: InsightRow): Insight {
 }
 
 export interface InsightsRepository {
-  categorySums(householdId: number, startISO: string, endISO: string): Promise<CategorySum[]>;
-  netAllTime(householdId: number): Promise<number>;
-  goalsFor(householdId: number): Promise<GoalInput[]>;
-  listActive(householdId: number): Promise<Insight[]>;
-  latestGeneratedAt(householdId: number): Promise<Date | null>;
+  categorySums(householdId: string, startISO: string, endISO: string): Promise<CategorySum[]>;
+  netAllTime(householdId: string): Promise<number>;
+  goalsFor(householdId: string): Promise<GoalInput[]>;
+  listActive(householdId: string): Promise<Insight[]>;
+  latestGeneratedAt(householdId: string): Promise<Date | null>;
   replaceAll(args: {
-    householdId: number;
+    householdId: string;
     period: { start: Date; end: Date };
     items: GeneratedInsight[];
     actorUuid: string;
@@ -51,99 +46,111 @@ export interface InsightsRepository {
 export function createInsightsRepository(db: Db): InsightsRepository {
   return {
     async categorySums(householdId, startISO, endISO) {
-      const rows = await db
-        .select({
-          name: sql<string>`coalesce(${category.name}, 'Sem categoria')`,
-          kind: sql<"income" | "expense">`coalesce(${category.kind}, case when ${transaction.direction} = 'in' then 'income' else 'expense' end)`,
-          cents: sql<number>`sum(${transaction.amountCents})::bigint`,
-        })
-        .from(transaction)
-        .innerJoin(account, eq(account.id, transaction.accountId))
-        .leftJoin(category, eq(category.id, transaction.categoryId))
-        .where(
-          and(
-            eq(account.householdId, householdId),
-            isNull(transaction.deletedAt),
-            gte(transaction.occurredAt, new Date(startISO)),
-            lt(transaction.occurredAt, new Date(endISO)),
-          ),
-        )
-        .groupBy(
-          category.id,
-          sql`coalesce(${category.name}, 'Sem categoria')`,
-          sql`coalesce(${category.kind}, case when ${transaction.direction} = 'in' then 'income' else 'expense' end)`,
-        );
-      return rows.map((r) => ({ name: r.name, kind: r.kind, cents: Number(r.cents) }));
+      const rows = await db.transaction.groupBy({
+        by: ["categoryId", "direction"],
+        where: {
+          deletedAt: null,
+          account: { householdId },
+          occurredAt: { gte: new Date(startISO), lt: new Date(endISO) },
+        },
+        _sum: { amountCents: true },
+      });
+      if (rows.length === 0) return [];
+
+      const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((id): id is string => id !== null))];
+      const categories = categoryIds.length
+        ? await db.category.findMany({
+            where: { uuid: { in: categoryIds } },
+            select: { uuid: true, name: true, kind: true },
+          })
+        : [];
+      const categoryByUuid = new Map(categories.map((c) => [c.uuid, c]));
+
+      // Group by category identity (not just name+kind — two categories can share both),
+      // falling back to direction-derived kind for uncategorized transactions.
+      const buckets = new Map<string, CategorySum>();
+      for (const r of rows) {
+        const cat = r.categoryId ? categoryByUuid.get(r.categoryId) : undefined;
+        const name = cat?.name ?? "Sem categoria";
+        const kind: "income" | "expense" = cat?.kind ?? (r.direction === "in" ? "income" : "expense");
+        const key = r.categoryId ?? `null:${kind}`;
+        const cents = Number(r._sum.amountCents ?? 0);
+        const existing = buckets.get(key);
+        if (existing) existing.cents += cents;
+        else buckets.set(key, { name, kind, cents });
+      }
+      return [...buckets.values()];
     },
 
     async netAllTime(householdId) {
-      const rows = await db
-        .select({
-          net: sql<number>`coalesce(sum(case when ${transaction.direction} = 'in' then ${transaction.amountCents} else -${transaction.amountCents} end), 0)::bigint`,
-        })
-        .from(transaction)
-        .innerJoin(account, eq(account.id, transaction.accountId))
-        .where(and(eq(account.householdId, householdId), isNull(transaction.deletedAt)));
-      return Number(rows[0]?.net ?? 0);
+      const rows = await db.transaction.groupBy({
+        by: ["direction"],
+        where: { deletedAt: null, account: { householdId } },
+        _sum: { amountCents: true },
+      });
+      const inCents = Number(rows.find((r) => r.direction === "in")?._sum.amountCents ?? 0);
+      const outCents = Number(rows.find((r) => r.direction === "out")?._sum.amountCents ?? 0);
+      return inCents - outCents;
     },
 
     async goalsFor(householdId) {
-      const rows = await db
-        .select({ name: goal.name, type: goal.type, targetCents: goal.targetAmountCents, currentCents: goal.currentAmountCents })
-        .from(goal)
-        .where(and(eq(goal.householdId, householdId), isNull(goal.deletedAt)));
-      return rows.map((r) => ({ name: r.name, type: r.type, targetCents: r.targetCents ?? null, currentCents: r.currentCents }));
+      const rows = await db.goal.findMany({
+        where: { householdId, deletedAt: null },
+        select: { name: true, type: true, targetAmountCents: true, currentAmountCents: true },
+      });
+      return rows.map((r) => ({
+        name: r.name,
+        type: r.type,
+        targetCents: r.targetAmountCents !== null ? Number(r.targetAmountCents) : null,
+        currentCents: Number(r.currentAmountCents),
+      }));
     },
 
     async listActive(householdId) {
-      const rows = await db
-        .select()
-        .from(insight)
-        .where(and(eq(insight.householdId, householdId), isNull(insight.deletedAt)))
-        .orderBy(desc(insight.generatedAt), desc(insight.id));
+      const rows = await db.insight.findMany({
+        where: { householdId, deletedAt: null },
+        orderBy: [{ generatedAt: "desc" }, { uuid: "desc" }],
+      });
       return rows.map(toDomain);
     },
 
     async latestGeneratedAt(householdId) {
-      const rows = await db
-        .select({ g: insight.generatedAt })
-        .from(insight)
-        .where(and(eq(insight.householdId, householdId), isNull(insight.deletedAt)))
-        .orderBy(desc(insight.generatedAt))
-        .limit(1);
-      return rows[0]?.g ?? null;
+      const row = await db.insight.findFirst({
+        where: { householdId, deletedAt: null },
+        orderBy: { generatedAt: "desc" },
+        select: { generatedAt: true },
+      });
+      return row?.generatedAt ?? null;
     },
 
     async replaceAll({ householdId, period, items, actorUuid }) {
-      return db.transaction(async (tx) => {
-        await tx.execute(sql`select pg_advisory_xact_lock(${householdId})`);
+      return db.$transaction(async (tx) => {
+        // Serialize concurrent regenerations for the same household (uuid hashed to a bigint lock key).
+        await tx.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${householdId}::text, 0))`;
         const now = new Date();
-        await tx
-          .update(insight)
-          .set({ deletedAt: now, updatedBy: actorUuid, updatedAt: now })
-          .where(and(eq(insight.householdId, householdId), isNull(insight.deletedAt)));
+        await tx.insight.updateMany({
+          where: { householdId, deletedAt: null },
+          data: { deletedAt: now, updatedBy: actorUuid, updatedAt: now },
+        });
         if (items.length === 0) return [];
-        const inserted = await tx
-          .insert(insight)
-          .values(
-            items.map((it) => ({
-              householdId,
-              kind: it.kind,
-              severity: it.severity,
-              title: it.title,
-              body: it.body,
-              recommendation: it.recommendation,
-              periodStart: period.start,
-              periodEnd: period.end,
-              generatedAt: now,
-              createdBy: actorUuid,
-              updatedBy: actorUuid,
-              createdAt: now,
-              updatedAt: now,
-            })),
-          )
-          .returning();
-        return (inserted as InsightRow[]).map(toDomain);
+        const inserted = await tx.insight.createManyAndReturn({
+          data: items.map((it) => ({
+            householdId,
+            kind: it.kind,
+            severity: it.severity,
+            title: it.title,
+            body: it.body,
+            recommendation: it.recommendation,
+            periodStart: period.start,
+            periodEnd: period.end,
+            generatedAt: now,
+            createdBy: actorUuid,
+            updatedBy: actorUuid,
+          })),
+        });
+        return inserted
+          .map(toDomain)
+          .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt) || b.id.localeCompare(a.id));
       });
     },
   };

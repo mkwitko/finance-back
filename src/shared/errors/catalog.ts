@@ -41,6 +41,7 @@ export const ERRORS = {
     NO_SUBSCRIPTION: make("SUB-T0004", 409, "subscription_none_active"),
     STRIPE_ERROR: make("SUB-T0005", 502, "subscription_stripe_error"),
     NO_OWNER: make("SUB-T0006", 409, "subscription_no_owner"),
+    OWNER_EMAIL_COLLISION: make("SUB-T0007", 409, "subscription_owner_email_collision"),
   },
   RESOURCE: {
     NOT_FOUND: make("RES-T0001", 404, "resource_not_found"),

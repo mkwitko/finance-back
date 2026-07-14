@@ -21,10 +21,10 @@ describe("subscription domain", () => {
     expect(planForPriceId("price_x")).toBe("free");
   });
   it("normalizes stripe status", () => {
-    expect(statusFromStripe("active", false)).toBe("active");
-    expect(statusFromStripe("trialing", false)).toBe("active");
-    expect(statusFromStripe("active", true)).toBe("active"); // still active until period end
-    expect(statusFromStripe("canceled", false)).toBe("canceled");
-    expect(statusFromStripe("incomplete", false)).toBe("expired");
+    expect(statusFromStripe("active")).toBe("active");
+    expect(statusFromStripe("trialing")).toBe("active");
+    expect(statusFromStripe("past_due")).toBe("active"); // still active until period end
+    expect(statusFromStripe("canceled")).toBe("canceled");
+    expect(statusFromStripe("incomplete")).toBe("expired");
   });
 });

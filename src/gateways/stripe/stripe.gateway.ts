@@ -76,13 +76,20 @@ export function createStripeGateway(opts: { secretKey: string; publishableKey: s
 
     findCustomerByEmail(email) {
       return wrap(async (c) => {
-        const res = await c.customers.list({ email, limit: 1 });
+        // limit: 2 so we can detect (and warn on) duplicates without changing behavior.
+        const res = await c.customers.list({ email, limit: 2 });
+        if (res.data.length > 1) {
+          logger.warn({ email, count: res.data.length }, "stripe.duplicate_customers_for_email");
+        }
         return res.data[0]?.id ?? null;
       });
     },
     ensureCustomer(email, name) {
       return wrap(async (c) => {
-        const existing = await c.customers.list({ email, limit: 1 });
+        const existing = await c.customers.list({ email, limit: 2 });
+        if (existing.data.length > 1) {
+          logger.warn({ email, count: existing.data.length }, "stripe.duplicate_customers_for_email");
+        }
         if (existing.data[0]) return existing.data[0].id;
         const created = await c.customers.create({ email, ...(name !== undefined ? { name } : {}) });
         return created.id;

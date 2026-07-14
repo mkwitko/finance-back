@@ -5,6 +5,7 @@ import fastifySensible from "@fastify/sensible";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { env } from "./config/env.js";
+import { assertSubscriptionPricesConfigured } from "./domain/subscription.js";
 import { httpRoutes } from "./http/index.js";
 import { errorHandlerPlugin } from "./http/plugins/error-handler/error-handler.js";
 import { gatewaysPlugin } from "./http/plugins/gateways-plugin/gateways-plugin.js";
@@ -30,6 +31,12 @@ function resolveCorsOrigin(): boolean | string[] {
 }
 
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
+  // Prod boot guard: fail fast if the Stripe price IDs are unconfigured/placeholder,
+  // instead of failing lazily at the first checkout. Dev/test use fakes, so skip.
+  if (env.NODE_ENV === "production") {
+    assertSubscriptionPricesConfigured();
+  }
+
   const app = Fastify({
     loggerInstance: logger as FastifyBaseLogger,
     trustProxy: env.TRUST_PROXY_HOPS, // trusted hops (ALB), never `true`

@@ -22,6 +22,7 @@
   "SUB-T0004": "No active subscription found.",
   "SUB-T0005": "Failed to reach the payment provider.",
   "SUB-T0006": "The household has no owner to bill.",
+  "SUB-T0007": "The new owner's email is already tied to a different billing customer.",
   "RES-T0001": "Resource not found.",
   "SYS-T0001": "Internal server error.",
   "SYS-T0002": "Invalid input.",

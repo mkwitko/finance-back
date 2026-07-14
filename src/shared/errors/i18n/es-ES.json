@@ -22,6 +22,7 @@
   "SUB-T0004": "No se encontró una suscripción activa.",
   "SUB-T0005": "Error al contactar con el proveedor de pago.",
   "SUB-T0006": "El hogar no tiene un responsable de facturación.",
+  "SUB-T0007": "El correo del nuevo responsable ya está vinculado a otro cliente de facturación.",
   "RES-T0001": "Recurso no encontrado.",
   "SYS-T0001": "Error interno del servidor.",
   "SYS-T0002": "Datos de entrada inválidos.",

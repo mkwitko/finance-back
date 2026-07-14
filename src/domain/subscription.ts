@@ -17,6 +17,28 @@ function priceAnnual(): string {
   return process.env.STRIPE_PRICE_PREMIUM_ANNUAL ?? "";
 }
 
+// Empty, angle-bracketed, or obviously-templated values that must never reach prod.
+const PLACEHOLDER_PRICE = /(^$)|placeholder|change[_-]?me|your[_-]?price|xxx+|<.*>/i;
+
+function isConfiguredPrice(id: string): boolean {
+  // Real Stripe price IDs look like `price_...`; reject empties and placeholders.
+  return id.startsWith("price_") && !PLACEHOLDER_PRICE.test(id);
+}
+
+/**
+ * Prod-boot guard. Fails fast with a clear message when the Stripe price IDs are
+ * unconfigured/placeholder, instead of surfacing a lazy PRICE_NOT_CONFIGURED error at
+ * the first checkout. Only meant to run when NODE_ENV === "production".
+ */
+export function assertSubscriptionPricesConfigured(): void {
+  const bad: string[] = [];
+  if (!isConfiguredPrice(priceMonthly())) bad.push(`STRIPE_PRICE_PREMIUM_MONTHLY="${priceMonthly()}"`);
+  if (!isConfiguredPrice(priceAnnual())) bad.push(`STRIPE_PRICE_PREMIUM_ANNUAL="${priceAnnual()}"`);
+  if (bad.length > 0) {
+    throw new Error(`Stripe subscription price IDs are not configured for production: ${bad.join(", ")}`);
+  }
+}
+
 export function priceIdForInterval(interval: BillingInterval): string {
   const id = interval === "monthly" ? priceMonthly() : priceAnnual();
   if (!id) throw ERRORS.SUB.PRICE_NOT_CONFIGURED({ interval });
@@ -33,7 +55,7 @@ export function planForPriceId(priceId: string): SubscriptionPlan {
   return intervalForPriceId(priceId) ? "premium" : "free";
 }
 
-export function statusFromStripe(stripeStatus: string, _cancelAtPeriodEnd: boolean): SubscriptionStatus {
+export function statusFromStripe(stripeStatus: string): SubscriptionStatus {
   if (["active", "trialing", "past_due"].includes(stripeStatus)) return "active";
   if (["canceled", "unpaid", "incomplete_expired"].includes(stripeStatus)) return "canceled";
   return "expired";

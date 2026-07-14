@@ -9,6 +9,7 @@ import {
   type SubscriptionStatus,
 } from "../../../domain/subscription.js";
 import type { StripeGateway } from "../../../gateways/stripe/stripe.gateway.js";
+import { logger } from "../../../infra/observability/logger.js";
 import { ERRORS } from "../../../shared/errors/catalog.js";
 import type { SubscriptionsData } from "./subscriptions.data.js";
 
@@ -66,14 +67,26 @@ export function createSubscriptionsService(deps: {
   }
 
   function present(sub: NonNullable<Awaited<ReturnType<typeof liveSub>>>["sub"]): SubscriptionView {
-    const plan = planForPriceId(sub.priceId);
-    const status = statusFromStripe(sub.status, sub.cancelAtPeriodEnd);
+    const interval = intervalForPriceId(sub.priceId);
+    let plan = planForPriceId(sub.priceId);
+    if (interval === null) {
+      // A live Stripe subscription whose price ID matches no configured plan — the
+      // dashboard price was rotated out from under us. Don't silently downgrade a
+      // paying customer to `free`: surface it and fall back to `premium` so their
+      // entitlements are preserved until the price config is updated.
+      logger.warn(
+        { priceId: sub.priceId, status: sub.status },
+        "subscription.price_not_in_config — rotated price? falling back to premium",
+      );
+      plan = "premium";
+    }
+    const status = statusFromStripe(sub.status);
     return {
       plan,
       status,
       currentPeriodEnd: sub.currentPeriodEnd,
       cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
-      interval: intervalForPriceId(sub.priceId),
+      interval,
       entitlements: entitlementsFor(plan, status),
     };
   }
@@ -143,6 +156,13 @@ export function createSubscriptionsService(deps: {
     async transferOwner(ctx, newOwnerEmail) {
       const found = await liveSub(ctx);
       if (!found) return; // free household: no billing link to move
+      // Defensive guard: if the new owner's email already belongs to a DIFFERENT Stripe
+      // customer, repointing this subscription's customer to that email would collide
+      // (two customers, same email) and could mis-resolve billing later. Fail clearly.
+      const collidingCustomerId = await stripe.findCustomerByEmail(newOwnerEmail);
+      if (collidingCustomerId && collidingCustomerId !== found.customerId) {
+        throw ERRORS.SUB.OWNER_EMAIL_COLLISION();
+      }
       await stripe.updateCustomerEmail(found.customerId, newOwnerEmail);
     },
   };

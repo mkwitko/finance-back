@@ -10,3 +10,7 @@ export const MemberView = z.object({
 export const ListMembersResponse = z.object({ members: z.array(MemberView) });
 export const UpdateMemberRoleBody = z.object({ role: z.enum(MEMBERSHIP_ROLES) });
 export type UpdateMemberRoleBody = z.infer<typeof UpdateMemberRoleBody>;
+
+export const TransferOwnershipBody = z.object({ newOwnerUserId: z.uuid() });
+export type TransferOwnershipBody = z.infer<typeof TransferOwnershipBody>;
+export const TransferOwnershipResponse = z.object({ ok: z.literal(true) });

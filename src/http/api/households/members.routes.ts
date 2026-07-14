@@ -5,12 +5,24 @@ import { db } from "../../../infra/db/client.js";
 import { ERRORS } from "../../../shared/errors/catalog.js";
 import { requireUser } from "../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../hooks/household/household.js";
+import { createSubscriptionsData } from "../subscriptions/subscriptions.data.js";
+import { createSubscriptionsService } from "../subscriptions/subscriptions.service.js";
 import { syncSeatsSafe } from "../subscriptions/sync-seats.js";
 import { createMembersRepository } from "./members.repository.js";
-import { ListMembersResponse, MemberView, UpdateMemberRoleBody } from "./members.schema.js";
+import {
+  ListMembersResponse,
+  MemberView,
+  TransferOwnershipBody,
+  TransferOwnershipResponse,
+  UpdateMemberRoleBody,
+} from "./members.schema.js";
 
 export const membersRoutes: FastifyPluginAsync = async (app) => {
   const members = createMembersRepository(db);
+  // Built once at registration, like subscriptions/index.ts: `app.gateways` is
+  // decorated before routes register and the service is request-stateless.
+  const subsData = createSubscriptionsData(db);
+  const subscriptions = createSubscriptionsService({ stripe: app.gateways.stripe, data: subsData });
 
   app.withTypeProvider<ZodTypeProvider>().get(
     "/households/:id/members",
@@ -97,6 +109,50 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
       });
       await syncSeatsSafe(app, { uuid: hh.uuid });
       return reply.code(204).send(null);
+    },
+  );
+
+  app.withTypeProvider<ZodTypeProvider>().post(
+    "/households/:id/transfer-ownership",
+    {
+      preHandler: requireHouseholdRole("owner"),
+      schema: {
+        operationId: "transferOwnership",
+        tags: ["households"],
+        summary: "Transfer ownership to an adult member (caller leaves the household)",
+        params: z.object({ id: z.string() }),
+        body: TransferOwnershipBody,
+        response: { 200: TransferOwnershipResponse },
+      },
+    },
+    async (req, reply) => {
+      const hh = requireHousehold(req);
+      const auth = requireUser(req);
+      const { newOwnerUserId } = req.body;
+
+      // 1. Resolve + validate target: an active `adult` member of THIS household who
+      //    is not the caller. Anything else is ineligible.
+      if (newOwnerUserId === auth.sub) throw ERRORS.HOUSEHOLD.TRANSFER_TARGET_INELIGIBLE();
+      const target = await members.findMember(hh.uuid, newOwnerUserId);
+      if (!target || target.role !== "adult") throw ERRORS.HOUSEHOLD.TRANSFER_TARGET_INELIGIBLE();
+      const targetEmail = await subsData.memberEmail(hh.uuid, newOwnerUserId);
+      if (!targetEmail) throw ERRORS.HOUSEHOLD.TRANSFER_TARGET_INELIGIBLE();
+
+      // 2. Stripe repoint FIRST (idempotent): no-ops for free households, guards
+      //    SUB-T0007 OWNER_EMAIL_COLLISION. On failure nothing is committed and the
+      //    caller is still owner, so a retry is safe.
+      await subscriptions.transferOwner({ uuid: hh.uuid }, targetEmail);
+
+      // 3. DB role swap: promote target to owner + soft-delete the caller's membership,
+      //    atomically under the per-household advisory lock (re-verifies the target).
+      await members.transferOwnership({
+        householdId: hh.uuid,
+        newOwnerUserId,
+        callerUserId: auth.sub,
+        actorUuid: auth.sub,
+      });
+
+      return reply.code(200).send({ ok: true });
     },
   );
 };

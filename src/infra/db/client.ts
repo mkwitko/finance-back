@@ -1,28 +1,18 @@
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import { env } from "../../config/env.js";
-import * as schema from "./schema.js";
+import { PrismaClient } from "@prisma/client";
 
-export type Schema = typeof schema;
-export type Db = NodePgDatabase<Schema>;
+export type Db = PrismaClient;
 
-// Lazy pool singleton: the `Pool` is constructed on first use (no connection is
-// opened until the first query), so importing this module does not require a live
-// database — only actually querying does.
-let pool: Pool | undefined;
-
-export function getPool(): Pool {
-  if (!pool) {
-    pool = new Pool({ connectionString: env.DATABASE_URL, max: env.DATABASE_POOL_MAX });
-  }
-  return pool;
+// Lazy singleton — no connection at import; first query connects.
+let client: PrismaClient | undefined;
+function getClient(): PrismaClient {
+  if (!client) client = new PrismaClient();
+  return client;
 }
-
-export const db: Db = drizzle(getPool(), { schema });
+export const db: Db = getClient();
 
 export async function closeDb(): Promise<void> {
-  if (pool) {
-    await pool.end();
-    pool = undefined;
+  if (client) {
+    await client.$disconnect();
+    client = undefined;
   }
 }

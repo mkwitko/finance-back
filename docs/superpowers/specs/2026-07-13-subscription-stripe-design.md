@@ -96,6 +96,15 @@ On **member join** (invitation accept) and **member remove**, after the membersh
 1. **Plan A — Backend:** stripe gateway, entitlements helpers, service (get/checkout/switch/cancel/syncSeats), 4 routes, remove v1 table/repo/routes + drop migration, membership seat-sync hooks, config env, tests, OpenAPI export.
 2. **Plan B — Frontend:** add `@stripe/stripe-react-native` + provider, regen hooks, rebuild `plan.tsx` as subscribe + manage portal with PaymentSheet, keep gate/hook, RNTL + export.
 
+## Ownership transfer (owner leaves)
+
+Because the Stripe customer is keyed to the **owner's email**, an owner leaving would orphan the subscription (a new owner's email wouldn't find it). Handling:
+
+- When the owner leaves, the household offers ownership to another member who is **not a kid** (i.e. an `adult`/`owner`-eligible member). A kid cannot become owner.
+- On transfer, the subscription service re-points Stripe to the new owner: locate the household's live subscription (via old owner email + `metadata.householdId`), then `stripe.customers.update(customerId, { email: newOwnerEmail })`. Subscription + `metadata.householdId` stay intact; read-time GET now resolves via the new owner's email.
+- If no eligible (non-kid) member exists, offer the leaving owner to cancel the subscription (`cancel_at_period_end`) before leaving.
+- **Scope note:** the full ownership-transfer UX/flow is a household-membership concern (separate subsystem). This subscription work provides the Stripe re-point hook (`subscriptionsService.transferOwner(householdId, newOwnerEmail)`) the transfer flow will call; wiring the leave/transfer UI is tracked separately.
+
 ## Open Questions (defaulted)
 
 - Trial period? — none in v1 (immediate charge). Easy to add via `trial_period_days`.

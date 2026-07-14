@@ -44,7 +44,7 @@ export const accountsRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const hh = requireHousehold(req);
       const created = await repo.create({
-        householdId: hh.id,
+        householdId: hh.uuid,
         name: req.body.name,
         kind: req.body.kind,
         institution: req.body.institution ?? null,
@@ -68,7 +68,7 @@ export const accountsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const accounts = await repo.listByHousehold(hh.id);
+      const accounts = await repo.listByHousehold(hh.uuid);
       return reply.code(200).send({ accounts: accounts.map(present) });
     },
   );

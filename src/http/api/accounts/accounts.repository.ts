@@ -1,11 +1,8 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import type { Account as AccountRow } from "@prisma/client";
 import type { AccountKind } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import type { AccountRow } from "../../../infra/db/tables/accounts/account.table.js";
-import { account } from "../../../infra/db/tables/accounts/account.table.js";
 
 export type Account = {
-  id: number;
   uuid: string;
   name: string;
   kind: AccountKind;
@@ -16,7 +13,7 @@ export type Account = {
 };
 
 export type CreateAccountInput = {
-  householdId: number;
+  householdId: string;
   name: string;
   kind: AccountKind;
   institution: string | null;
@@ -26,7 +23,6 @@ export type CreateAccountInput = {
 
 function toDomain(row: AccountRow): Account {
   return {
-    id: row.id,
     uuid: row.uuid,
     name: row.name,
     kind: row.kind,
@@ -39,18 +35,16 @@ function toDomain(row: AccountRow): Account {
 
 export interface AccountsRepository {
   create(input: CreateAccountInput): Promise<Account>;
-  listByHousehold(householdId: number): Promise<Account[]>;
+  listByHousehold(householdId: string): Promise<Account[]>;
   /** Resolve an account by public uuid, scoped to its household (ownership check). */
-  findByUuid(householdId: number, uuid: string): Promise<Account | null>;
+  findByUuid(householdId: string, uuid: string): Promise<Account | null>;
 }
 
 export function createAccountsRepository(db: Db): AccountsRepository {
   return {
     async create(input) {
-      const now = new Date();
-      const inserted = await db
-        .insert(account)
-        .values({
+      const row = await db.account.create({
+        data: {
           householdId: input.householdId,
           name: input.name,
           kind: input.kind,
@@ -58,35 +52,24 @@ export function createAccountsRepository(db: Db): AccountsRepository {
           currency: input.currency,
           createdBy: input.actorUuid,
           updatedBy: input.actorUuid,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      return toDomain(inserted[0] as AccountRow);
+        },
+      });
+      return toDomain(row);
     },
 
     async listByHousehold(householdId) {
-      const rows = await db
-        .select()
-        .from(account)
-        .where(and(eq(account.householdId, householdId), isNull(account.deletedAt)))
-        .orderBy(desc(account.createdAt), desc(account.id));
+      const rows = await db.account.findMany({
+        where: { householdId, deletedAt: null },
+        orderBy: [{ createdAt: "desc" }, { uuid: "desc" }],
+      });
       return rows.map(toDomain);
     },
 
     async findByUuid(householdId, uuid) {
-      const rows = await db
-        .select()
-        .from(account)
-        .where(
-          and(
-            eq(account.householdId, householdId),
-            eq(account.uuid, uuid),
-            isNull(account.deletedAt),
-          ),
-        )
-        .limit(1);
-      return rows[0] ? toDomain(rows[0]) : null;
+      const row = await db.account.findFirst({
+        where: { householdId, uuid, deletedAt: null },
+      });
+      return row ? toDomain(row) : null;
     },
   };
 }

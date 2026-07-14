@@ -5,6 +5,7 @@ import { db } from "../../../infra/db/client.js";
 import { ERRORS } from "../../../shared/errors/catalog.js";
 import { requireUser } from "../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../hooks/household/household.js";
+import { syncSeatsSafe } from "../subscriptions/sync-seats.js";
 import { createMembersRepository } from "./members.repository.js";
 import { ListMembersResponse, MemberView, UpdateMemberRoleBody } from "./members.schema.js";
 
@@ -92,6 +93,7 @@ export const membersRoutes: FastifyPluginAsync = async (app) => {
         if (owners <= 1) throw ERRORS.HOUSEHOLD.LAST_OWNER();
       }
       await members.removeMember({ householdId: hh.id, userId: target.userId, actorUuid: auth.sub });
+      await syncSeatsSafe(app, { id: hh.id, uuid: hh.uuid });
       return reply.code(204).send(null);
     },
   );

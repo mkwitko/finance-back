@@ -62,4 +62,14 @@ describe("subscription e2e (stripe-faked)", () => {
     const checkout = await h.app.inject({ method: "POST", url: `/households/${id}/subscription/checkout`, headers: daveHh, payload: { interval: "monthly" } });
     expect(checkout.statusCode).toBe(403);
   });
+
+  it("member join/leave does not break subscription GET (seat sync best-effort)", async () => {
+    const auth = { authorization: `Bearer ${await login("dave")}` };
+    const hh = await h.app.inject({ method: "POST", url: "/households", headers: auth, payload: { name: "D", type: "family" } });
+    const id = hh.json().id as string;
+    const s = { ...auth, "x-household-id": id };
+    await h.app.inject({ method: "POST", url: `/households/${id}/subscription/checkout`, headers: s, payload: { interval: "monthly" } });
+    const still = await h.app.inject({ method: "GET", url: `/households/${id}/subscription`, headers: s });
+    expect(still.json().plan).toBe("premium");
+  });
 });

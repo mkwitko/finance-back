@@ -8,6 +8,7 @@ import { requireUser } from "../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../hooks/household/household.js";
 import { createHouseholdsRepository } from "../households/households.repository.js";
 import { createMembersRepository } from "../households/members.repository.js";
+import { syncSeatsSafe } from "../subscriptions/sync-seats.js";
 import { createUsersRepository } from "../users/users.repository.js";
 import type { Invitation } from "./invitations.repository.js";
 import { createInvitationsRepository } from "./invitations.repository.js";
@@ -126,6 +127,7 @@ export const invitationsRoutes: FastifyPluginAsync = async (app) => {
         role: invite.role,
         actorUuid: auth.sub,
       });
+      await syncSeatsSafe(app, { id: invite.householdDbId, uuid: invite.householdUuid });
       const joined = await households
         .listForUser(auth.sub)
         .then((hs) => hs.find((h) => h.uuid === invite.householdUuid));

@@ -10,6 +10,5 @@ export { invitation } from "./tables/households/invitation.table.js";
 export { membership } from "./tables/households/membership.table.js";
 export { importBatch } from "./tables/imports/import-batch.table.js";
 export { insight } from "./tables/insights/insight.table.js";
-export { subscription } from "./tables/subscriptions/subscription.table.js";
 export { transaction } from "./tables/transactions/transaction.table.js";
 export { user } from "./tables/users/user.table.js";

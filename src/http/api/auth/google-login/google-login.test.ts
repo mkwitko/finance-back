@@ -8,7 +8,6 @@ import type { AuthRepository } from "../auth.repository.js";
 import { createGoogleLoginService } from "./google-login.service.js";
 
 const USER: User = {
-  id: 1,
   uuid: "user-uuid",
   email: "alice@example.com",
   name: "Alice",

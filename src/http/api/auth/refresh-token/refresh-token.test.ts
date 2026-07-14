@@ -6,7 +6,6 @@ import type { AuthRepository, StoredRefreshToken } from "../auth.repository.js";
 import { createRefreshService } from "./refresh-token.service.js";
 
 const USER: User = {
-  id: 1,
   uuid: "user-uuid",
   email: "alice@example.com",
   name: "Alice",
@@ -43,8 +42,8 @@ const svc = (deps: ReturnType<typeof makeDeps>) =>
 describe("refresh service", () => {
   it("rotates a valid refresh token and issues a fresh pair", async () => {
     const deps = makeDeps({
-      id: 5,
-      userId: 1,
+      id: "refresh-token-uuid",
+      userId: "user-uuid",
       expiresAt: new Date(Date.now() + 100_000),
       revokedAt: null,
     });
@@ -63,8 +62,8 @@ describe("refresh service", () => {
 
   it("rejects a revoked token with AUTH-T0006", async () => {
     const deps = makeDeps({
-      id: 5,
-      userId: 1,
+      id: "refresh-token-uuid",
+      userId: "user-uuid",
       expiresAt: new Date(Date.now() + 100_000),
       revokedAt: new Date(),
     });
@@ -73,8 +72,8 @@ describe("refresh service", () => {
 
   it("rejects an expired token with AUTH-T0007", async () => {
     const deps = makeDeps({
-      id: 5,
-      userId: 1,
+      id: "refresh-token-uuid",
+      userId: "user-uuid",
       expiresAt: new Date(Date.now() - 1),
       revokedAt: null,
     });

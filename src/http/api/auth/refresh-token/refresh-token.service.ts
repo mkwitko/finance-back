@@ -26,7 +26,7 @@ export function createRefreshService(deps: RefreshDeps) {
     const newRefresh = generateRefreshToken();
     await deps.authRepo.rotate({
       oldId: stored.id,
-      userId: user.id,
+      userId: user.uuid,
       newHash: hashToken(newRefresh),
       expiresAt: new Date(Date.now() + deps.refreshTtlSeconds * 1000),
       actorUuid: user.uuid,

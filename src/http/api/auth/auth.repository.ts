@@ -1,24 +1,22 @@
-import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../../../infra/db/client.js";
-import { refreshToken } from "../../../infra/db/tables/auth/refresh-token.table.js";
 
 export type StoredRefreshToken = {
-  id: number;
-  userId: number;
+  id: string;
+  userId: string;
   expiresAt: Date;
   revokedAt: Date | null;
 };
 
 export type InsertRefreshTokenInput = {
-  userId: number;
+  userId: string;
   tokenHash: string;
   expiresAt: Date;
   actorUuid: string;
 };
 
 export type RotateRefreshTokenInput = {
-  oldId: number;
-  userId: number;
+  oldId: string;
+  userId: string;
   newHash: string;
   expiresAt: Date;
   actorUuid: string;
@@ -36,52 +34,51 @@ export interface AuthRepository {
 export function createAuthRepository(db: Db): AuthRepository {
   return {
     async insertRefreshToken(input) {
-      await db.insert(refreshToken).values({
-        userId: input.userId,
-        tokenHash: input.tokenHash,
-        expiresAt: input.expiresAt,
-        createdBy: input.actorUuid,
-        updatedBy: input.actorUuid,
+      await db.refreshToken.create({
+        data: {
+          userId: input.userId,
+          tokenHash: input.tokenHash,
+          expiresAt: input.expiresAt,
+          createdBy: input.actorUuid,
+          updatedBy: input.actorUuid,
+        },
       });
     },
 
     async findByHash(tokenHash) {
-      const rows = await db
-        .select({
-          id: refreshToken.id,
-          userId: refreshToken.userId,
-          expiresAt: refreshToken.expiresAt,
-          revokedAt: refreshToken.revokedAt,
-        })
-        .from(refreshToken)
-        .where(eq(refreshToken.tokenHash, tokenHash))
-        .limit(1);
-      return rows[0] ?? null;
+      const row = await db.refreshToken.findUnique({
+        where: { tokenHash },
+        select: { uuid: true, userId: true, expiresAt: true, revokedAt: true },
+      });
+      if (!row) return null;
+      return { id: row.uuid, userId: row.userId, expiresAt: row.expiresAt, revokedAt: row.revokedAt };
     },
 
     async rotate(input) {
       const now = new Date();
-      await db.transaction(async (tx) => {
-        await tx
-          .update(refreshToken)
-          .set({ revokedAt: now, updatedAt: now, updatedBy: input.actorUuid })
-          .where(and(eq(refreshToken.id, input.oldId), isNull(refreshToken.revokedAt)));
-        await tx.insert(refreshToken).values({
-          userId: input.userId,
-          tokenHash: input.newHash,
-          expiresAt: input.expiresAt,
-          createdBy: input.actorUuid,
-          updatedBy: input.actorUuid,
+      await db.$transaction(async (tx) => {
+        await tx.refreshToken.updateMany({
+          where: { uuid: input.oldId, revokedAt: null },
+          data: { revokedAt: now, updatedAt: now, updatedBy: input.actorUuid },
+        });
+        await tx.refreshToken.create({
+          data: {
+            userId: input.userId,
+            tokenHash: input.newHash,
+            expiresAt: input.expiresAt,
+            createdBy: input.actorUuid,
+            updatedBy: input.actorUuid,
+          },
         });
       });
     },
 
     async revokeByHash(tokenHash) {
       const now = new Date();
-      await db
-        .update(refreshToken)
-        .set({ revokedAt: now, updatedAt: now })
-        .where(and(eq(refreshToken.tokenHash, tokenHash), isNull(refreshToken.revokedAt)));
+      await db.refreshToken.updateMany({
+        where: { tokenHash, revokedAt: null },
+        data: { revokedAt: now, updatedAt: now },
+      });
     },
   };
 }

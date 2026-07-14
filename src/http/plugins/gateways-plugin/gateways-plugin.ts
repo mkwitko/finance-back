@@ -3,6 +3,7 @@ import fp from "fastify-plugin";
 import { env, googleClientIds } from "../../../config/env.js";
 import { createDeepseekGateway } from "../../../gateways/deepseek/deepseek.gateway.js";
 import { createGoogleGateway } from "../../../gateways/google/google.gateway.js";
+import { createStripeGateway } from "../../../gateways/stripe/stripe.gateway.js";
 import type { Gateways } from "../../../types/fastify.js";
 
 export function buildDefaultGateways(): Gateways {
@@ -12,6 +13,10 @@ export function buildDefaultGateways(): Gateways {
       apiKey: env.DEEPSEEK_API_KEY,
       baseUrl: env.DEEPSEEK_BASE_URL,
       model: env.DEEPSEEK_MODEL,
+    }),
+    stripe: createStripeGateway({
+      secretKey: env.STRIPE_SECRET_KEY,
+      publishableKey: env.STRIPE_PUBLISHABLE_KEY,
     }),
   };
 }

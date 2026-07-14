@@ -91,7 +91,10 @@ export function createHouseholdsRepository(db: Db): HouseholdsRepository {
           createdBy: actorUuid,
           updatedBy: actorUuid,
         },
-        update: {},
+        // Resurrect a soft-deleted membership on re-join (and adopt the new
+        // invite's role). The redeem flow rejects an ACTIVE member before this,
+        // so this only ever revives a left/removed membership.
+        update: { deletedAt: null, role, updatedBy: actorUuid },
       });
     },
   };

@@ -1,4 +1,4 @@
-import type { SubscriptionPlan, SubscriptionStatus } from "../infra/db/tables/subscriptions/subscription.table.js";
+import type { SubscriptionPlan, SubscriptionStatus } from "./subscription.js";
 
 export type Entitlements = {
   aiInsights: boolean;

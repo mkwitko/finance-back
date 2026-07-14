@@ -34,6 +34,14 @@ export const ERRORS = {
     ALREADY_MEMBER: make("INV-T0003", 409, "invitation_already_member"),
     ROLE_TOO_HIGH: make("INV-T0004", 403, "invitation_role_too_high"),
   },
+  SUB: {
+    PRICE_NOT_CONFIGURED: make("SUB-T0001", 500, "subscription_price_not_configured"),
+    STRIPE_DISABLED: make("SUB-T0002", 503, "subscription_stripe_disabled"),
+    ALREADY_SUBSCRIBED: make("SUB-T0003", 409, "subscription_already_subscribed"),
+    NO_SUBSCRIPTION: make("SUB-T0004", 409, "subscription_none_active"),
+    STRIPE_ERROR: make("SUB-T0005", 502, "subscription_stripe_error"),
+    NO_OWNER: make("SUB-T0006", 409, "subscription_no_owner"),
+  },
   RESOURCE: {
     NOT_FOUND: make("RES-T0001", 404, "resource_not_found"),
   },

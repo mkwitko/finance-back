@@ -49,7 +49,7 @@ export const householdsRoutes: FastifyPluginAsync = async (app) => {
       const created = await repo.create({
         name: req.body.name,
         type: req.body.type,
-        ownerUserId: user.id,
+        ownerUserUuid: user.uuid,
         actorUuid: user.uuid,
       });
       return reply.code(201).send(present(created));

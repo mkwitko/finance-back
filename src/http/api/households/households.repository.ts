@@ -1,15 +1,10 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import type { Household as HouseholdRow } from "@prisma/client";
 import type { MembershipRole } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import type { HouseholdRow } from "../../../infra/db/tables/households/household.table.js";
-import { household } from "../../../infra/db/tables/households/household.table.js";
-import { membership } from "../../../infra/db/tables/households/membership.table.js";
-import { user } from "../../../infra/db/tables/users/user.table.js";
 import type { CreateHouseholdInput, Household, MembershipContext } from "./households.types.js";
 
 function toDomain(row: HouseholdRow, role?: MembershipRole): Household {
   return {
-    id: row.id,
     uuid: row.uuid,
     name: row.name,
     type: row.type,
@@ -31,8 +26,8 @@ export interface HouseholdsRepository {
   }): Promise<MembershipContext | null>;
   /** Add (or ignore-if-exists) a member with a role. */
   addMember(args: {
-    householdId: number;
-    userId: number;
+    householdId: string;
+    userId: string;
     role: MembershipRole;
     actorUuid: string;
   }): Promise<void>;
@@ -41,86 +36,63 @@ export interface HouseholdsRepository {
 export function createHouseholdsRepository(db: Db): HouseholdsRepository {
   return {
     async create(input) {
-      return db.transaction(async (tx) => {
-        const now = new Date();
-        const inserted = await tx
-          .insert(household)
-          .values({
+      return db.$transaction(async (tx) => {
+        const row = await tx.household.create({
+          data: {
             name: input.name,
             type: input.type,
             createdBy: input.actorUuid,
             updatedBy: input.actorUuid,
-            createdAt: now,
-            updatedAt: now,
-          })
-          .returning();
-        const row = inserted[0] as HouseholdRow;
-        await tx.insert(membership).values({
-          userId: input.ownerUserId,
-          householdId: row.id,
-          role: "owner",
-          createdBy: input.actorUuid,
-          updatedBy: input.actorUuid,
-          createdAt: now,
-          updatedAt: now,
+          },
+        });
+        await tx.membership.create({
+          data: {
+            userId: input.ownerUserUuid,
+            householdId: row.uuid,
+            role: "owner",
+            createdBy: input.actorUuid,
+            updatedBy: input.actorUuid,
+          },
         });
         return toDomain(row, "owner");
       });
     },
 
     async listForUser(userUuid) {
-      const rows = await db
-        .select({ h: household, role: membership.role })
-        .from(membership)
-        .innerJoin(household, eq(household.id, membership.householdId))
-        .innerJoin(user, eq(user.id, membership.userId))
-        .where(
-          and(eq(user.uuid, userUuid), isNull(membership.deletedAt), isNull(household.deletedAt)),
-        )
-        .orderBy(desc(household.createdAt), desc(household.id));
-      return rows.map((r) => toDomain(r.h, r.role));
+      const rows = await db.membership.findMany({
+        where: { userId: userUuid, deletedAt: null, household: { deletedAt: null } },
+        select: { role: true, household: true },
+        orderBy: [{ household: { createdAt: "desc" } }, { household: { uuid: "desc" } }],
+      });
+      return rows.map((r) => toDomain(r.household, r.role));
     },
 
     async findMembershipContext({ userUuid, householdUuid }) {
-      const rows = await db
-        .select({
-          id: household.id,
-          uuid: household.uuid,
-          type: household.type,
-          role: membership.role,
-        })
-        .from(membership)
-        .innerJoin(household, eq(household.id, membership.householdId))
-        .innerJoin(user, eq(user.id, membership.userId))
-        .where(
-          and(
-            eq(user.uuid, userUuid),
-            eq(household.uuid, householdUuid),
-            isNull(membership.deletedAt),
-            isNull(household.deletedAt),
-          ),
-        )
-        .limit(1);
-      return rows[0] ?? null;
+      const row = await db.membership.findFirst({
+        where: {
+          userId: userUuid,
+          householdId: householdUuid,
+          deletedAt: null,
+          household: { deletedAt: null },
+        },
+        select: { role: true, household: { select: { uuid: true, type: true } } },
+      });
+      if (!row) return null;
+      return { uuid: row.household.uuid, type: row.household.type, role: row.role };
     },
 
     async addMember({ householdId, userId, role, actorUuid }) {
-      const now = new Date();
-      await db
-        .insert(membership)
-        .values({
+      await db.membership.upsert({
+        where: { userId_householdId: { userId, householdId } },
+        create: {
           userId,
           householdId,
           role,
           createdBy: actorUuid,
           updatedBy: actorUuid,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [membership.userId, membership.householdId],
-          set: { role, deletedAt: null, updatedBy: actorUuid, updatedAt: now },
-        });
+        },
+        update: {},
+      });
     },
   };
 }

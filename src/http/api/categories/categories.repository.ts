@@ -1,11 +1,8 @@
-import { and, asc, eq, isNull, or } from "drizzle-orm";
+import type { Category as CategoryRow } from "@prisma/client";
 import type { CategoryKind } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import type { CategoryRow } from "../../../infra/db/tables/categories/category.table.js";
-import { category } from "../../../infra/db/tables/categories/category.table.js";
 
 export type Category = {
-  id: number;
   uuid: string;
   name: string;
   kind: CategoryKind;
@@ -15,7 +12,7 @@ export type Category = {
 };
 
 export type CreateCategoryInput = {
-  householdId: number;
+  householdId: string;
   name: string;
   kind: CategoryKind;
   icon: string | null;
@@ -24,7 +21,6 @@ export type CreateCategoryInput = {
 
 function toDomain(row: CategoryRow): Category {
   return {
-    id: row.id,
     uuid: row.uuid,
     name: row.name,
     kind: row.kind,
@@ -36,59 +32,48 @@ function toDomain(row: CategoryRow): Category {
 
 export interface CategoriesRepository {
   /** System defaults (householdId null) + the household's own custom categories. */
-  listVisible(householdId: number): Promise<Category[]>;
+  listVisible(householdId: string): Promise<Category[]>;
   create(input: CreateCategoryInput): Promise<Category>;
   /** Resolve a category visible to the household (system OR its own) by uuid. */
-  findVisibleByUuid(householdId: number, uuid: string): Promise<Category | null>;
+  findVisibleByUuid(householdId: string, uuid: string): Promise<Category | null>;
 }
 
 export function createCategoriesRepository(db: Db): CategoriesRepository {
   return {
     async listVisible(householdId) {
-      const rows = await db
-        .select()
-        .from(category)
-        .where(
-          and(
-            or(isNull(category.householdId), eq(category.householdId, householdId)),
-            isNull(category.deletedAt),
-          ),
-        )
-        .orderBy(asc(category.kind), asc(category.name));
+      const rows = await db.category.findMany({
+        where: {
+          OR: [{ householdId: null }, { householdId }],
+          deletedAt: null,
+        },
+        orderBy: [{ kind: "asc" }, { name: "asc" }],
+      });
       return rows.map(toDomain);
     },
 
     async create(input) {
-      const now = new Date();
-      const inserted = await db
-        .insert(category)
-        .values({
+      const created = await db.category.create({
+        data: {
           householdId: input.householdId,
           name: input.name,
           kind: input.kind,
           icon: input.icon,
           createdBy: input.actorUuid,
           updatedBy: input.actorUuid,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      return toDomain(inserted[0] as CategoryRow);
+        },
+      });
+      return toDomain(created);
     },
 
     async findVisibleByUuid(householdId, uuid) {
-      const rows = await db
-        .select()
-        .from(category)
-        .where(
-          and(
-            eq(category.uuid, uuid),
-            or(isNull(category.householdId), eq(category.householdId, householdId)),
-            isNull(category.deletedAt),
-          ),
-        )
-        .limit(1);
-      return rows[0] ? toDomain(rows[0]) : null;
+      const row = await db.category.findFirst({
+        where: {
+          uuid,
+          OR: [{ householdId: null }, { householdId }],
+          deletedAt: null,
+        },
+      });
+      return row ? toDomain(row) : null;
     },
   };
 }

@@ -38,7 +38,7 @@ export const categoriesRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, reply) => {
       const hh = requireHousehold(req);
-      const categories = await repo.listVisible(hh.id);
+      const categories = await repo.listVisible(hh.uuid);
       return reply.code(200).send({ categories: categories.map(present) });
     },
   );
@@ -58,7 +58,7 @@ export const categoriesRoutes: FastifyPluginAsync = async (app) => {
     async (req, reply) => {
       const hh = requireHousehold(req);
       const created = await repo.create({
-        householdId: hh.id,
+        householdId: hh.uuid,
         name: req.body.name,
         kind: req.body.kind,
         icon: req.body.icon ?? null,

@@ -9,7 +9,7 @@ import type { ImportsRepository } from "./imports.repository.js";
 import { type NormalizedRow, parseCsv, parseOfx } from "./parsers.js";
 
 export type ImportInput = {
-  householdId: number;
+  householdId: string;
   accountId: number;
   source: ImportSource;
   content: string;
@@ -68,7 +68,7 @@ async function parseRows(
 }
 
 async function categorizeRows(
-  householdId: number,
+  householdId: string,
   rows: NormalizedRow[],
   deps: { deepseek: DeepseekGateway; categoriesRepo: CategoriesRepository },
 ) {
@@ -88,7 +88,7 @@ async function categorizeRows(
 
 export function createPreviewService(deps: ImportServiceDeps) {
   return async (input: {
-    householdId: number;
+    householdId: string;
     accountId: number;
     source: ImportSource;
     content: string;
@@ -115,7 +115,7 @@ export function createPreviewService(deps: ImportServiceDeps) {
 
 export function createCommitService(deps: ImportServiceDeps) {
   return async (input: {
-    householdId: number;
+    householdId: string;
     accountId: number;
     source: ImportSource;
     rows: CommitRow[];
@@ -141,7 +141,7 @@ export function createCommitService(deps: ImportServiceDeps) {
       const byName = new Map(categories.map((c) => [c.name, c]));
       const toInsert: CreateTransactionInput[] = fresh.map((r) => ({
         accountId: input.accountId,
-        categoryId: r.categoryName ? (byName.get(r.categoryName)?.id ?? null) : null,
+        categoryId: r.categoryName ? (byName.get(r.categoryName)?.uuid ?? null) : null,
         importBatchId: batch.id,
         amountCents: r.amountCents,
         direction: r.direction,
@@ -190,7 +190,7 @@ export function createImportService(deps: ImportServiceDeps) {
         const matched = guess?.category ? byName.get(guess.category) : undefined;
         return {
           accountId: input.accountId,
-          categoryId: matched?.id ?? null,
+          categoryId: matched?.uuid ?? null,
           importBatchId: batch.id,
           amountCents: r.amountCents,
           direction: r.direction,

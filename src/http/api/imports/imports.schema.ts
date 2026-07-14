@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { IMPORT_SOURCES } from "../../../infra/db/tables/imports/import-batch.table.js";
+import { IMPORT_SOURCES } from "../../../domain/enums.js";
 
 export const CreateImportBody = z.object({
   source: z.enum(IMPORT_SOURCES),

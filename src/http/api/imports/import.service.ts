@@ -1,5 +1,5 @@
+import type { ImportSource } from "../../../domain/enums.js";
 import type { DeepseekGateway } from "../../../gateways/deepseek/deepseek.gateway.js";
-import type { ImportSource } from "../../../infra/db/tables/imports/import-batch.table.js";
 import type { CategoriesRepository } from "../categories/categories.repository.js";
 import type {
   CreateTransactionInput,

@@ -1,8 +1,8 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
+import type { MembershipRole } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
 import type { HouseholdRow } from "../../../infra/db/tables/households/household.table.js";
 import { household } from "../../../infra/db/tables/households/household.table.js";
-import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
 import { membership } from "../../../infra/db/tables/households/membership.table.js";
 import { user } from "../../../infra/db/tables/users/user.table.js";
 import type { CreateHouseholdInput, Household, MembershipContext } from "./households.types.js";

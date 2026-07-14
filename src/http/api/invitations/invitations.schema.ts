@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { MEMBERSHIP_ROLES } from "../../../infra/db/tables/households/membership.table.js";
+import { MEMBERSHIP_ROLES } from "../../../domain/enums.js";
 import { HouseholdView } from "../households/households.schema.js";
 
 export const CreateInvitationBody = z.object({

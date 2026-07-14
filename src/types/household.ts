@@ -1,5 +1,4 @@
-import type { HouseholdType } from "../infra/db/tables/households/household.table.js";
-import type { MembershipRole } from "../infra/db/tables/households/membership.table.js";
+import type { HouseholdType, MembershipRole } from "../domain/enums.js";
 
 /**
  * Active-household context resolved per request by `requireHousehold`. Holds the

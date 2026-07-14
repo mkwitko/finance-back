@@ -1,11 +1,7 @@
 import { bigint, index, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { INSIGHT_KINDS, INSIGHT_SEVERITIES } from "../../../../domain/enums.js";
 import { entityColumns } from "../../columns.js";
 import { household } from "../households/household.table.js";
-
-export const INSIGHT_KINDS = ["spending_alert", "summary", "trend", "advice"] as const;
-export type InsightKind = (typeof INSIGHT_KINDS)[number];
-export const INSIGHT_SEVERITIES = ["info", "warning", "positive"] as const;
-export type InsightSeverity = (typeof INSIGHT_SEVERITIES)[number];
 
 // An AI-generated insight card over a household's finances. A "generation" is the
 // batch sharing the newest generatedAt; regeneration soft-deletes the prior batch.

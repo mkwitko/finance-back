@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { TRANSACTION_DIRECTIONS } from "../../../infra/db/tables/transactions/transaction.table.js";
+import { TRANSACTION_DIRECTIONS } from "../../../domain/enums.js";
 
 export const CreateTransactionBody = z.object({
   accountId: z.uuid(),

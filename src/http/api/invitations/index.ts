@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod/v4";
+import { ROLE_RANK } from "../../../domain/enums.js";
 import { db } from "../../../infra/db/client.js";
-import { ROLE_RANK } from "../../../infra/db/tables/households/membership.table.js";
 import { ERRORS } from "../../../shared/errors/catalog.js";
 import { requireUser } from "../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../hooks/household/household.js";

@@ -1,11 +1,8 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
+import type { TransactionDirection, TransactionSource } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
 import { account } from "../../../infra/db/tables/accounts/account.table.js";
 import { category } from "../../../infra/db/tables/categories/category.table.js";
-import type {
-  TransactionDirection,
-  TransactionSource,
-} from "../../../infra/db/tables/transactions/transaction.table.js";
 import { transaction } from "../../../infra/db/tables/transactions/transaction.table.js";
 
 // Denormalized display row (joins account + category) — what the app's list needs.

@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
+import type { MembershipRole } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
 import { membership } from "../../../infra/db/tables/households/membership.table.js";
-import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
 import { user } from "../../../infra/db/tables/users/user.table.js";
 
 export type Member = {

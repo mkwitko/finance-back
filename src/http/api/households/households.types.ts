@@ -1,5 +1,4 @@
-import type { HouseholdType } from "../../../infra/db/tables/households/household.table.js";
-import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
+import type { HouseholdType, MembershipRole } from "../../../domain/enums.js";
 
 // Domain household. `id` is the internal bigint PK (never serialized — presenters
 // expose `uuid` as `id`). `role` is the CALLER's role, present on "my households".

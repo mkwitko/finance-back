@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { MEMBERSHIP_ROLES } from "../../../infra/db/tables/households/membership.table.js";
+import { MEMBERSHIP_ROLES } from "../../../domain/enums.js";
 
 export const MemberView = z.object({
   userId: z.uuid(),

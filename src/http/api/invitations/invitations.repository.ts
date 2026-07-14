@@ -1,11 +1,11 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import type { MembershipRole } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
 import { household } from "../../../infra/db/tables/households/household.table.js";
 import {
   type InvitationRow,
   invitation,
 } from "../../../infra/db/tables/households/invitation.table.js";
-import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
 import { generateInviteCode } from "./code.js";
 
 export type Invitation = {
@@ -105,7 +105,11 @@ export function createInvitationsRepository(db: Db): InvitationsRepository {
         .limit(1);
       const r = rows[0];
       if (!r) return null;
-      return { ...toDomain(r.inv), householdDbId: r.inv.householdId, householdUuid: r.householdUuid };
+      return {
+        ...toDomain(r.inv),
+        householdDbId: r.inv.householdId,
+        householdUuid: r.householdUuid,
+      };
     },
 
     async revoke({ householdId, invitationUuid, actorUuid }) {

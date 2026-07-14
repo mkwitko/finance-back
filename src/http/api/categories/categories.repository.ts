@@ -1,9 +1,7 @@
 import { and, asc, eq, isNull, or } from "drizzle-orm";
+import type { CategoryKind } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import type {
-  CategoryKind,
-  CategoryRow,
-} from "../../../infra/db/tables/categories/category.table.js";
+import type { CategoryRow } from "../../../infra/db/tables/categories/category.table.js";
 import { category } from "../../../infra/db/tables/categories/category.table.js";
 
 export type Category = {

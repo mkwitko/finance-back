@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
-import type { InsightKind, InsightSeverity } from "../../infra/db/tables/insights/insight.table.js";
-import { INSIGHT_KINDS, INSIGHT_SEVERITIES } from "../../infra/db/tables/insights/insight.table.js";
+import type { InsightKind, InsightSeverity } from "../../domain/enums.js";
+import { INSIGHT_KINDS, INSIGHT_SEVERITIES } from "../../domain/enums.js";
 import { logger } from "../../infra/observability/logger.js";
 
 export type CategorizationItem = {

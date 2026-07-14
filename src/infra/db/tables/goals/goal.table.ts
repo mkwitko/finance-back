@@ -1,20 +1,11 @@
 import { bigint, index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { GOAL_TYPES } from "../../../../domain/enums.js";
 import { entityColumns } from "../../columns.js";
 import { household } from "../households/household.table.js";
 
 // A financial objective the copilot tracks and plans toward. Amounts are integer
 // cents. `params` holds type-specific inputs (age, monthly contribution, expected
 // return, debt list) as JSON so the goal engine can evolve without a migration.
-export const GOAL_TYPES = [
-  "house",
-  "car",
-  "emergency",
-  "retirement",
-  "trip",
-  "debt",
-  "independence",
-] as const;
-export type GoalType = (typeof GOAL_TYPES)[number];
 
 export const goal = pgTable(
   "goal",

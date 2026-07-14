@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { INSIGHT_KINDS, INSIGHT_SEVERITIES } from "../../../infra/db/tables/insights/insight.table.js";
+import { INSIGHT_KINDS, INSIGHT_SEVERITIES } from "../../../domain/enums.js";
 
 export const InsightView = z.object({
   id: z.uuid(),

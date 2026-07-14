@@ -1,4 +1,5 @@
 import { bigint, index, pgTable, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { MEMBERSHIP_ROLES } from "../../../../domain/enums.js";
 import { entityColumns } from "../../columns.js";
 import { user } from "../users/user.table.js";
 import { household } from "./household.table.js";
@@ -6,17 +7,6 @@ import { household } from "./household.table.js";
 // Join between a user and a household, carrying the user's role in that household.
 // Roles are ordered by power (see ROLE_RANK in the RBAC hook): owner > adult > teen
 // > child > viewer. A user has one membership row per household (unique).
-export const MEMBERSHIP_ROLES = ["owner", "adult", "teen", "child", "viewer"] as const;
-export type MembershipRole = (typeof MEMBERSHIP_ROLES)[number];
-
-// Roles ordered by power: owner > adult > teen > child > viewer.
-export const ROLE_RANK: Record<MembershipRole, number> = {
-  owner: 4,
-  adult: 3,
-  teen: 2,
-  child: 1,
-  viewer: 0,
-};
 
 export const membership = pgTable(
   "membership",

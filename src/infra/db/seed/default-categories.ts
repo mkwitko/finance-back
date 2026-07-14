@@ -1,7 +1,7 @@
 import { and, isNull } from "drizzle-orm";
+import type { CategoryKind } from "../../../domain/enums.js";
 import { SYSTEM_ACTOR_UUID } from "../../../shared/constants/system-actor.js";
 import type { Db } from "../client.js";
-import type { CategoryKind } from "../tables/categories/category.table.js";
 import { category } from "../tables/categories/category.table.js";
 
 // System default categories (householdId = null, visible to everyone). Kept in pt-BR

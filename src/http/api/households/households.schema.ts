@@ -1,6 +1,5 @@
 import { z } from "zod/v4";
-import { HOUSEHOLD_TYPES } from "../../../infra/db/tables/households/household.table.js";
-import { MEMBERSHIP_ROLES } from "../../../infra/db/tables/households/membership.table.js";
+import { HOUSEHOLD_TYPES, MEMBERSHIP_ROLES } from "../../../domain/enums.js";
 
 export const CreateHouseholdBody = z.object({
   name: z.string().min(1).max(255),

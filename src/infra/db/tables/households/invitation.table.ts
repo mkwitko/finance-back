@@ -1,7 +1,7 @@
 import { bigint, index, pgTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { MEMBERSHIP_ROLES } from "../../../../domain/enums.js";
 import { entityColumns } from "../../columns.js";
 import { household } from "./household.table.js";
-import { MEMBERSHIP_ROLES } from "./membership.table.js";
 
 // A shareable invite code that grants membership (with a fixed `role`) in a household
 // when redeemed by a logged-in user. Active = revokedAt IS NULL AND expiresAt > now()

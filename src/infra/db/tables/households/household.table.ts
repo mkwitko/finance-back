@@ -1,11 +1,10 @@
 import { index, pgTable, varchar } from "drizzle-orm/pg-core";
+import { HOUSEHOLD_TYPES } from "../../../../domain/enums.js";
 import { entityColumns } from "../../columns.js";
 
 // A "money space" shared by one or more users. `type` shapes the UX and the default
 // role set: `individual` (solo), `family`, `shared` (e.g. a couple's joint pot), or
 // `kids` (allowance space a parent manages). Membership + role live in `membership`.
-export const HOUSEHOLD_TYPES = ["individual", "family", "shared", "kids"] as const;
-export type HouseholdType = (typeof HOUSEHOLD_TYPES)[number];
 
 export const household = pgTable(
   "household",

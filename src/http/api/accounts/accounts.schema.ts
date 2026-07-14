@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { ACCOUNT_KINDS } from "../../../infra/db/tables/accounts/account.table.js";
+import { ACCOUNT_KINDS } from "../../../domain/enums.js";
 
 export const CreateAccountBody = z.object({
   name: z.string().min(1).max(255),

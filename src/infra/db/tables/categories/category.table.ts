@@ -1,12 +1,11 @@
 import { type AnyPgColumn, bigint, index, pgTable, varchar } from "drizzle-orm/pg-core";
+import { CATEGORY_KINDS } from "../../../../domain/enums.js";
 import { entityColumns } from "../../columns.js";
 import { household } from "../households/household.table.js";
 
 // Spending/earning bucket. `householdId = null` marks a SYSTEM default category
 // (seeded once, shared by everyone); a non-null value is a household's own custom
 // category. `parentId` self-reference allows sub-categories ("Food" > "Delivery").
-export const CATEGORY_KINDS = ["income", "expense"] as const;
-export type CategoryKind = (typeof CATEGORY_KINDS)[number];
 
 export const category = pgTable(
   "category",

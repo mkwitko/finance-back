@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
+import type { AccountKind } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import type { AccountKind, AccountRow } from "../../../infra/db/tables/accounts/account.table.js";
+import type { AccountRow } from "../../../infra/db/tables/accounts/account.table.js";
 import { account } from "../../../infra/db/tables/accounts/account.table.js";
 
 export type Account = {

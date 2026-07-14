@@ -1,14 +1,10 @@
 import { bigint, index, integer, pgTable, varchar } from "drizzle-orm/pg-core";
+import { IMPORT_SOURCES, IMPORT_STATUSES } from "../../../../domain/enums.js";
 import { entityColumns } from "../../columns.js";
 import { household } from "../households/household.table.js";
 
 // One ingestion run: an uploaded OFX/CSV statement or a scanned receipt's extracted
 // text. Transactions produced by the run link back via `transaction.import_batch_id`.
-export const IMPORT_SOURCES = ["ofx", "csv", "receipt"] as const;
-export type ImportSource = (typeof IMPORT_SOURCES)[number];
-
-export const IMPORT_STATUSES = ["pending", "processing", "completed", "failed"] as const;
-export type ImportStatus = (typeof IMPORT_STATUSES)[number];
 
 export const importBatch = pgTable(
   "import_batch",

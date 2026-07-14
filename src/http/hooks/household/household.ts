@@ -1,7 +1,7 @@
 import type { FastifyRequest, preHandlerHookHandler } from "fastify";
+import type { MembershipRole } from "../../../domain/enums.js";
+import { ROLE_RANK } from "../../../domain/enums.js";
 import { db } from "../../../infra/db/client.js";
-import type { MembershipRole } from "../../../infra/db/tables/households/membership.table.js";
-import { ROLE_RANK } from "../../../infra/db/tables/households/membership.table.js";
 import { ERRORS } from "../../../shared/errors/catalog.js";
 import type { HouseholdContext } from "../../../types/household.js";
 import { createHouseholdsRepository } from "../../api/households/households.repository.js";

@@ -1,9 +1,7 @@
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import type { ImportSource } from "../../../domain/enums.js";
 import type { Db } from "../../../infra/db/client.js";
-import type {
-  ImportBatchRow,
-  ImportSource,
-} from "../../../infra/db/tables/imports/import-batch.table.js";
+import type { ImportBatchRow } from "../../../infra/db/tables/imports/import-batch.table.js";
 import { importBatch } from "../../../infra/db/tables/imports/import-batch.table.js";
 import { transaction } from "../../../infra/db/tables/transactions/transaction.table.js";
 

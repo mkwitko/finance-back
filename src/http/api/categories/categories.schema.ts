@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { CATEGORY_KINDS } from "../../../infra/db/tables/categories/category.table.js";
+import { CATEGORY_KINDS } from "../../../domain/enums.js";
 
 export const CreateCategoryBody = z.object({
   name: z.string().min(1).max(128),

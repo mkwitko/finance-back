@@ -26,12 +26,17 @@
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
       "esbuild",
       "cpu-features",
+      "prisma",
       "protobufjs",
       "ssh2"
     ]
@@ -44,6 +49,7 @@
     "@fastify/sensible": "^6.0.4",
     "@fastify/swagger": "^9.8.0",
     "@fastify/swagger-ui": "^6.1.0",
+    "@prisma/client": "^6.19.3",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.10.0",
     "fastify-plugin": "^6.0.0",
@@ -61,6 +67,7 @@
     "@types/node": "^26.1.1",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
+    "prisma": "^6.19.3",
     "tsup": "^8.5.1",
     "tsx": "^4.23.0",
     "typescript": "~5.9.0",

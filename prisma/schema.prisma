@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountKind {
+  cash
+  checking
+  credit
+  investment
+  prepaid
+}
+
+enum CategoryKind {
+  income
+  expense
+}
+
+enum GoalType {
+  house
+  car
+  emergency
+  retirement
+  trip
+  debt
+  independence
+}
+
+enum HouseholdType {
+  individual
+  family
+  shared
+  kids
+}
+
+enum MembershipRole {
+  owner
+  adult
+  teen
+  child
+  viewer
+}
+
+enum ImportSource {
+  ofx
+  csv
+  receipt
+}
+
+enum ImportStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum InsightKind {
+  spending_alert
+  summary
+  trend
+  advice
+}
+
+enum InsightSeverity {
+  info
+  warning
+  positive
+}
+
+enum TransactionDirection {
+  in
+  out
+}
+
+enum TransactionSource {
+  manual
+  import
+  receipt
+}
+
+model User {
+  uuid          String    @id @default(uuid(7)) @db.Uuid
+  createdBy     String    @db.Uuid
+  updatedBy     String    @db.Uuid
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt     DateTime? @db.Timestamptz(6)
+  googleSub     String    @unique
+  email         String    @unique
+  name          String
+  picture       String?
+  emailVerified Boolean   @default(false)
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+
+  @@index([createdAt, uuid])
+}
+
+model RefreshToken {
+  uuid      String    @id @default(uuid(7)) @db.Uuid
+  createdBy String    @db.Uuid
+  updatedBy String    @db.Uuid
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamptz(6)
+  revokedAt DateTime? @db.Timestamptz(6)
+
+  @@index([userId])
+}
+
+model Household {
+  uuid          String    @id @default(uuid(7)) @db.Uuid
+  createdBy     String    @db.Uuid
+  updatedBy     String    @db.Uuid
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt     DateTime? @db.Timestamptz(6)
+  name          String
+  type          HouseholdType
+  accounts      Account[]
+  categories    Category[]
+  goals         Goal[]
+  memberships   Membership[]
+  invitations   Invitation[]
+  importBatches ImportBatch[]
+  insights      Insight[]
+
+  @@index([createdAt, uuid])
+}
+
+model Account {
+  uuid         String    @id @default(uuid(7)) @db.Uuid
+  createdBy    String    @db.Uuid
+  updatedBy    String    @db.Uuid
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt    DateTime? @db.Timestamptz(6)
+  householdId  String    @db.Uuid
+  household    Household  @relation(fields: [householdId], references: [uuid], onDelete: Cascade)
+  name         String
+  kind         AccountKind
+  institution  String?
+  currency     String    @default("BRL") @db.Char(3)
+  transactions Transaction[]
+
+  @@index([householdId])
+}
+
+model Category {
+  uuid         String    @id @default(uuid(7)) @db.Uuid
+  createdBy    String    @db.Uuid
+  updatedBy    String    @db.Uuid
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt    DateTime? @db.Timestamptz(6)
+  householdId  String?   @db.Uuid
+  household    Household? @relation(fields: [householdId], references: [uuid], onDelete: Cascade)
+  name         String
+  kind         CategoryKind
+  parentId     String?   @db.Uuid
+  parent       Category?  @relation("CategoryChildren", fields: [parentId], references: [uuid], onDelete: SetNull)
+  children     Category[] @relation("CategoryChildren")
+  icon         String?
+  transactions Transaction[]
+
+  @@index([householdId])
+}
+
+model Goal {
+  uuid               String    @id @default(uuid(7)) @db.Uuid
+  createdBy          String    @db.Uuid
+  updatedBy          String    @db.Uuid
+  createdAt          DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt          DateTime? @db.Timestamptz(6)
+  householdId        String    @db.Uuid
+  household          Household  @relation(fields: [householdId], references: [uuid], onDelete: Cascade)
+  type               GoalType
+  name               String
+  targetAmountCents  BigInt?
+  targetDate         DateTime? @db.Timestamptz(6)
+  currentAmountCents BigInt    @default(0)
+  params             Json      @default("{}")
+
+  @@index([householdId])
+}
+
+model Invitation {
+  uuid        String    @id @default(uuid(7)) @db.Uuid
+  createdBy   String    @db.Uuid
+  updatedBy   String    @db.Uuid
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt   DateTime? @db.Timestamptz(6)
+  householdId String    @db.Uuid
+  household   Household  @relation(fields: [householdId], references: [uuid], onDelete: Cascade)
+  code        String    @unique
+  role        MembershipRole
+  expiresAt   DateTime  @db.Timestamptz(6)
+  revokedAt   DateTime? @db.Timestamptz(6)
+
+  @@index([householdId])
+}
+
+model Membership {
+  uuid        String    @id @default(uuid(7)) @db.Uuid
+  createdBy   String    @db.Uuid
+  updatedBy   String    @db.Uuid
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt   DateTime? @db.Timestamptz(6)
+  userId      String    @db.Uuid
+  user        User       @relation(fields: [userId], references: [uuid], onDelete: Cascade)
+  householdId String    @db.Uuid
+  household   Household  @relation(fields: [householdId], references: [uuid], onDelete: Cascade)
+  role        MembershipRole
+
+  @@unique([userId, householdId])
+  @@index([householdId])
+}
+
+model ImportBatch {
+  uuid             String    @id @default(uuid(7)) @db.Uuid
+  createdBy        String    @db.Uuid
+  updatedBy        String    @db.Uuid
+  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt        DateTime? @db.Timestamptz(6)
+  householdId      String    @db.Uuid
+  household        Household  @relation(fields: [householdId], references: [uuid], onDelete: Cascade)
+  source           ImportSource
+  status           ImportStatus @default(pending)
+  fileRef          String?
+  transactionCount Int       @default(0)
+  error            String?
+  transactions     Transaction[]
+
+  @@index([householdId])
+}
+
+model Insight {
+  uuid           String    @id @default(uuid(7)) @db.Uuid
+  createdBy      String    @db.Uuid
+  updatedBy      String    @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt      DateTime? @db.Timestamptz(6)
+  householdId    String    @db.Uuid
+  household      Household  @relation(fields: [householdId], references: [uuid], onDelete: Cascade)
+  kind           InsightKind
+  severity       InsightSeverity
+  title          String
+  body           String
+  recommendation String?
+  periodStart    DateTime  @db.Timestamptz(6)
+  periodEnd      DateTime  @db.Timestamptz(6)
+  generatedAt    DateTime  @db.Timestamptz(6)
+
+  @@index([householdId])
+}
+
+model Transaction {
+  uuid          String    @id @default(uuid(7)) @db.Uuid
+  createdBy     String    @db.Uuid
+  updatedBy     String    @db.Uuid
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt     DateTime? @db.Timestamptz(6)
+  accountId     String    @db.Uuid
+  account       Account    @relation(fields: [accountId], references: [uuid], onDelete: Cascade)
+  categoryId    String?   @db.Uuid
+  category      Category?  @relation(fields: [categoryId], references: [uuid], onDelete: SetNull)
+  importBatchId String?   @db.Uuid
+  importBatch   ImportBatch? @relation(fields: [importBatchId], references: [uuid], onDelete: SetNull)
+  amountCents   BigInt
+  direction     TransactionDirection
+  occurredAt    DateTime  @db.Timestamptz(6)
+  description   String
+  source        TransactionSource
+  rawRef        String?
+  aiCategorized Boolean   @default(false)
+  aiConfidence  Int?
+
+  @@index([accountId, occurredAt])
+  @@index([categoryId])
+}

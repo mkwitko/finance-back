@@ -1,7 +1,6 @@
-// Domain user. `id` is the internal bigint PK — never serialized by the API
+// Domain user. `uuid` is the identity — never serialized differently by the API
 // (presenters expose `uuid` as `id`). Dates are ISO strings above the repository.
 export type User = {
-  id: number;
   uuid: string;
   email: string;
   name: string;

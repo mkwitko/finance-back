@@ -12,20 +12,23 @@ architecture, Pino logs, typed error catalog, Vitest tests. Follows the
 
 ## Requirements
 
-- Node.js 22+, pnpm 10, Docker (for local Postgres and Testcontainers).
+- Node.js 22+, pnpm 10. **No Docker for development** — the database is
+  [Neon](https://neon.tech) serverless Postgres. Docker is only needed to run
+  the e2e tests (Testcontainers) and to build the production image.
 
 ## Run it
 
 ```bash
-cp .env.example .env            # fill JWT_SECRET + GOOGLE_CLIENT_IDS
-pnpm install
-pnpm dev:db                     # start Postgres (docker compose)
-pnpm prisma:generate            # generate the Prisma client
-pnpm db:migrate                 # apply migrations (prisma migrate dev)
+cp .env.example .env.local      # paste Neon DATABASE_URL, fill JWT_SECRET + GOOGLE_CLIENT_IDS
+pnpm install                    # postinstall runs `prisma generate`
+pnpm db:migrate                 # apply migrations to Neon (prisma migrate dev)
 pnpm db:seed                    # seed baseline data (SYSTEM actor, etc.)
-pnpm dev:native                 # start API with hot reload (tsx watch)
-# or: pnpm dev                  # docker compose up postgres + API
+pnpm dev                        # start API with hot reload (tsx watch)
 ```
+
+Both the app and the Prisma CLI auto-load `.env.local` (via Node's
+`--env-file-if-exists` and `prisma.config.ts` respectively) — no `dotenv`
+wrapper, no exported shell vars.
 
 - Health: `GET http://localhost:3000/health`
 - OpenAPI: `GET http://localhost:3000/openapi.json` (and Swagger UI at `/docs`).
@@ -35,8 +38,9 @@ pnpm dev:native                 # start API with hot reload (tsx watch)
 
 | Script | What |
 |---|---|
-| `pnpm dev:native` | API with hot reload |
+| `pnpm dev` | API with hot reload (tsx watch, loads `.env.local`) |
 | `pnpm build` / `pnpm start` | tsup build → run `dist/server.js` |
+| `docker build -t finance-back .` | Production image (multi-stage, distroless) |
 | `pnpm typecheck` | `tsc --noEmit` (strict) |
 | `pnpm check` / `pnpm check:fix` | Biome lint + format |
 | `pnpm test:unit` / `pnpm test:e2e` / `pnpm test` | Vitest |

@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { db } from "../../../../infra/db/client.js";
 import { requireHousehold, requireHouseholdRole } from "../../../hooks/household/household.js";
-import { JOIN_LINK, present } from "../invitations.present.js";
+import { JOIN_LINK, present } from "../invitations.presenter.js";
 import { createInvitationsRepository } from "../invitations.repository.js";
 import { ListInvitationsResponse } from "../invitations.schema.js";
 

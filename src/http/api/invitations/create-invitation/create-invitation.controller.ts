@@ -5,7 +5,7 @@ import { db } from "../../../../infra/db/client.js";
 import { ERRORS } from "../../../../shared/errors/catalog.js";
 import { requireUser } from "../../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../../hooks/household/household.js";
-import { JOIN_LINK, present } from "../invitations.present.js";
+import { JOIN_LINK, present } from "../invitations.presenter.js";
 import { createInvitationsRepository } from "../invitations.repository.js";
 import { CreateInvitationBody, InvitationView } from "../invitations.schema.js";
 

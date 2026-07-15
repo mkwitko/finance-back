@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { db } from "../../../../infra/db/client.js";
 import { requireUser } from "../../../hooks/auth/auth.js";
 import { requireHousehold, requireHouseholdRole } from "../../../hooks/household/household.js";
-import { present } from "../categories.present.js";
+import { present } from "../categories.presenter.js";
 import { createCategoriesRepository } from "../categories.repository.js";
 import { CategoryView as CategoryViewSchema, CreateCategoryBody } from "../categories.schema.js";
 

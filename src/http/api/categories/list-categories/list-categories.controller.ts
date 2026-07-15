@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { db } from "../../../../infra/db/client.js";
 import { requireHousehold, requireHouseholdRole } from "../../../hooks/household/household.js";
-import { present } from "../categories.present.js";
+import { present } from "../categories.presenter.js";
 import { createCategoriesRepository } from "../categories.repository.js";
 import { ListCategoriesResponse } from "../categories.schema.js";
 
